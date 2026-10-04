@@ -148,6 +148,7 @@ def pull_state() -> None:
     with session() as s:
         active = [e.id for e in s.scalars(select(Episode)) if not _expired(e)]
     work = d.folder("_system", "work")
+    (ROOT / "data").mkdir(parents=True, exist_ok=True)
     for eid in active:
         tgz = ROOT / "data" / f"ep{eid:04d}.tar.gz"
         if not _work_dir(eid).exists() and d.download(tgz.name, work, tgz):
@@ -179,6 +180,7 @@ def push_state() -> None:
         c.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE)")
     d.upload(_db_path(), sysdir, "worldprep.db")
     work = d.folder("_system", "work")
+    (ROOT / "data").mkdir(parents=True, exist_ok=True)
     existing = dict((name, fid) for fid, name in d.list_names(work))
     with session() as s:
         eps = [(e.id, _expired(e)) for e in s.scalars(select(Episode))]
