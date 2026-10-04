@@ -1,0 +1,1855 @@
+Claude Code — 世界先修課
+AI Travel Documentary Autonomous YouTube System Master Prompt
+
+You are the lead software architect, AI engineer, content-system designer, video-production engineer, and DevOps engineer responsible for building a highly automated YouTube documentary production system.
+
+The goal is to build an autonomous content-production pipeline for a YouTube channel named:
+
+世界先修課
+
+The system should research, fact-check, write, storyboard, generate/acquire visuals, generate narration, edit/render, create subtitles, create thumbnails, generate metadata, perform quality checks, upload the finished video to YouTube as PRIVATE, and send the owner an approval email every morning at 08:00 Asia/Taipei.
+
+When the owner clicks APPROVE, the system should automatically change the corresponding YouTube video from PRIVATE to PUBLIC.
+
+The final system should be production-oriented, modular, observable, fault-tolerant, secure, cost-aware, and capable of running daily with minimal human intervention.
+
+1. CHANNEL IDENTITY
+1.1 Channel Name
+
+The official channel name is:
+
+世界先修課
+
+English conceptual translation:
+
+GLOBAL SMARTER BEFORE YOU GO
+
+Do not automatically translate the Chinese channel name into a literal English channel name unless needed for metadata or international-facing systems.
+
+2. BRAND POSITIONING
+
+世界先修課 is NOT a normal travel vlog.
+
+It is NOT:
+
+a hotel recommendation channel
+a restaurant recommendation channel
+a travel itinerary channel
+a "Top 10 attractions" channel
+a single-landmark introduction channel
+a simple travel guide
+a personal travel diary
+a pure geography lecture
+a pure history channel
+
+The core positioning is:
+
+旅行之前，先理解一個地方。
+
+The channel helps viewers understand why a city or country looks, operates, and feels the way it does today.
+
+The viewer should finish each video feeling:
+
+"原來這個地方之所以變成今天這樣，是因為這些歷史、城市發展、商業力量與文化演變。"
+
+The channel should make people want to visit the place AFTER understanding it, rather than simply listing places to visit.
+
+3. CORE SLOGAN
+
+The primary official slogan is:
+
+「先看懂世界，再出發。」
+
+This is the main brand slogan and should be treated as a recurring brand element.
+
+Secondary brand concept:
+
+「旅行，不只是看風景。」
+
+The system may use this sentence in channel descriptions, opening narration, trailers, or branding materials, but the primary slogan remains:
+
+先看懂世界，再出發。
+
+4. CORE EDITORIAL DNA
+
+Every major city/country documentary should follow this conceptual framework:
+
+歷史 → 城市 → 商業 → 文化 → 景點
+
+This is the most important editorial rule in the entire system.
+
+The system should NOT mechanically create five disconnected sections.
+
+Instead, the five dimensions should form one continuous story.
+
+For example:
+
+Historical event
+↓
+changes political/economic structure
+↓
+changes urban development
+↓
+creates industries/business ecosystem
+↓
+influences culture and lifestyle
+↓
+eventually creates the places and attractions travelers see today
+
+The final attraction section should feel like the CONSEQUENCE of the story.
+
+The viewer should understand:
+
+"Now I understand why this place looks like this."
+
+rather than:
+
+"Here are five tourist attractions."
+
+5. BRAND PERSONALITY
+
+The content should feel:
+
+intelligent
+curious
+cinematic
+accessible
+sophisticated
+geographically aware
+historically grounded
+economically insightful
+culturally sensitive
+entertaining
+visually memorable
+
+Avoid sounding like:
+
+a textbook
+a Wikipedia article
+a tourism bureau
+an academic paper
+a generic AI-generated travel article
+
+The narration should be natural Traditional Chinese suitable for Taiwanese viewers.
+
+Use clear, conversational Traditional Chinese.
+
+Avoid unnecessary jargon.
+
+When technical economic, financial, historical, or geopolitical concepts are necessary, explain them through simple examples.
+
+6. TARGET VIEWER
+
+Primary audience:
+
+18–40
+interested in travel
+interested in cities and countries
+curious about history and culture
+interested in business/economics
+wants to understand a place before traveling
+enjoys documentary-style YouTube content
+likes learning through storytelling rather than lectures
+
+Secondary audience:
+
+business/finance professionals
+university students
+international travelers
+people interested in geopolitics
+people who enjoy city documentaries
+7. VIDEO LENGTH
+
+Default target:
+
+10–15 minutes
+
+Allow configurable lengths:
+
+8 minutes
+10 minutes
+12 minutes
+15 minutes
+20 minutes
+
+Default production setting:
+
+TARGET_VIDEO_LENGTH_MINUTES=12
+
+The system should optimize script length according to actual narration speed rather than blindly targeting word count.
+
+8. VIDEO TITLE SYSTEM
+
+This is a critical branding requirement.
+
+Every video title must contain:
+
+「｜世界先修課 EP」
+
+The preferred format is:
+
+[High-curiosity main title]｜世界先修課 EP.01
+
+Example:
+
+為什麼東京能成為世界之都？｜世界先修課 EP.01
+
+小國如何變成亞洲金融中心？新加坡崛起的秘密｜世界先修課 EP.02
+
+為什麼伊斯坦堡能連接東西方？一座城市的千年野心｜世界先修課 EP.03
+
+The exact episode numbering should be generated automatically.
+
+Use:
+
+EP.01
+EP.02
+EP.03
+
+rather than:
+
+EP1 / EP2 / Episode 1
+
+9. TITLE PHILOSOPHY
+
+Titles should be MORE ATTRACTIVE than ordinary educational/documentary titles.
+
+The title should create:
+
+curiosity
+a question
+a surprising contradiction
+a historical mystery
+a business insight
+a "I never thought about it that way" feeling
+a reason to click BEFORE knowing the answer
+
+The title should make the viewer think:
+
+"Wait, why?"
+
+or:
+
+"I never knew that."
+
+or:
+
+"I should understand this before I go there."
+
+However:
+
+NEVER use dishonest clickbait.
+
+The title must be supported by the actual video.
+
+Avoid meaningless titles such as:
+
+東京旅遊攻略
+東京十大景點
+東京必去景點
+新加坡旅遊介紹
+京都景點推薦
+XXX完整介紹
+
+These are too generic and violate the channel positioning.
+
+10. TITLE PATTERNS
+
+The Title Agent should consider these patterns.
+
+Pattern A — WHY
+
+為什麼東京能成為世界之都？｜世界先修課 EP.01
+
+為什麼大阪會成為日本的商業中心？｜世界先修課 EP.02
+
+Pattern B — BEFORE YOU GO
+
+去新加坡之前，你一定要先搞懂這個國家｜世界先修課 EP.03
+
+第一次去京都前，先看懂這座千年古都｜世界先修課 EP.04
+
+Pattern C — CONTRADICTION
+
+一個沒有天然資源的小國，為什麼能成為亞洲金融中心？｜世界先修課 EP.05
+
+Pattern D — HISTORICAL TRANSFORMATION
+
+從港口小城到世界金融中心，新加坡是怎麼做到的？｜世界先修課 EP.06
+
+Pattern E — BUSINESS
+
+豐田為什麼改變了整個名古屋？｜世界先修課 EP.07
+
+Pattern F — CITY IDENTITY
+
+京都為什麼能活過千年？｜世界先修課 EP.08
+
+Pattern G — GEOPOLITICAL / GEOGRAPHICAL
+
+為什麼這座城市，注定成為東西方的交界？｜世界先修課 EP.09
+
+Pattern H — BIG QUESTION
+
+一座城市，為什麼可以決定一個國家的命運？｜世界先修課 EP.10
+
+11. TITLE GENERATION PROCESS
+
+Before generating the final title, the Title Agent must generate at least:
+
+10 candidate titles
+
+Then score them based on:
+
+Curiosity
+Clarity
+Relevance to destination
+Historical depth
+Business/economic insight
+Cultural interest
+Travel relevance
+Thumbnail compatibility
+Accuracy
+Click appeal without clickbait
+
+The final title should maximize:
+
+Curiosity × Relevance × Truth × Brand Fit
+
+rather than keyword stuffing.
+
+12. THUMBNAIL BRANDING
+
+Thumbnail design should have a recognizable visual identity.
+
+Primary visual language:
+
+cinematic
+high contrast
+deep navy / dark blue foundation
+warm gold accent
+white typography
+strong photographic imagery
+dramatic skyline / landscape
+one major visual subject
+minimal clutter
+
+The visual identity should be inspired by the following conceptual design:
+
+globe + airplane + world travel + documentary + education
+
+The logo should NOT simply be a collection of famous landmarks.
+
+Avoid putting:
+
+Eiffel Tower
+Tokyo Tower
+Merlion
+Colosseum
+Mount Fuji
+Big Ben
+
+all into one logo.
+
+The logo must remain recognizable regardless of destination.
+
+13. LOGO SYSTEM
+
+Primary logo concept:
+
+A circular / semi-circular globe icon combined with a subtle airplane trajectory.
+
+Suggested visual elements:
+
+dark navy circular background
+white simplified globe
+white or gold airplane
+curved flight path
+bold Traditional Chinese typography:
+世界先修課
+optional small English text:
+GLOBAL SMARTER BEFORE YOU GO
+
+The logo should communicate:
+
+World + Travel + Knowledge + Preparation
+
+rather than:
+
+Tourism agency
+
+The logo should work in:
+
+YouTube profile picture
+video opening
+video watermark
+thumbnail
+website
+social media profile
+email
+favicon
+
+The system should generate the logo in multiple formats/aspect ratios where possible:
+
+1:1
+horizontal
+transparent-background version
+monochrome version
+dark-background version
+light-background version
+14. VISUAL BRAND SYSTEM
+
+Recommended brand palette:
+
+Primary:
+
+Deep Navy
+White
+
+Accent:
+
+Warm Gold
+
+Secondary:
+
+muted sky blue
+neutral gray
+
+Do not make every video visually identical.
+
+The destination's actual colors should remain visible.
+
+The brand colors should appear through:
+
+typography
+logo
+episode badge
+graphic elements
+lines
+labels
+transitions
+15. EPISODE BADGE
+
+Every thumbnail should include a small consistent badge:
+
+世界先修課 | EP.01
+
+or:
+
+EP.01
+
+The badge should be visually consistent across all episodes.
+
+It should NOT dominate the thumbnail.
+
+The destination and main question remain the most important visual elements.
+
+16. OPENING SEQUENCE
+
+Every video should have a short recognizable opening.
+
+Target:
+
+2–4 seconds
+
+Suggested structure:
+
+Quick cinematic visual of destination
+Globe / airplane motion
+世界先修課 logo
+Primary slogan
+
+Primary slogan:
+
+先看懂世界，再出發。
+
+Optional opening line:
+
+旅行，不只是看風景。
+
+Example:
+
+「旅行，不只是看風景。」
+
+[brief visual transition]
+
+「先看懂世界，再出發。」
+
+[logo]
+
+Then immediately begin the documentary.
+
+Do NOT create a long intro.
+
+The branding should never delay the actual story.
+
+17. CHANNEL DESCRIPTION
+
+Use this as the conceptual foundation for the channel description:
+
+如果旅行是一堂課，這裡就是你的先修課。
+
+我們從歷史、城市、商業、文化，到最後真正值得你親眼看見的景點，帶你在出發之前，先看懂一個地方。
+
+因為旅行，不只是看風景。
+
+先看懂世界，再出發。
+
+The system may adapt this description for SEO, but must preserve the core meaning.
+
+18. CONTENT STRUCTURE
+
+Default documentary structure:
+
+0. Hook
+
+0:00–0:30
+
+Start with a powerful question, contradiction, surprising fact, or visual.
+
+Do NOT begin with:
+
+"大家好，歡迎來到世界先修課。"
+
+Avoid generic YouTube intros.
+
+Instead:
+
+"如果我告訴你，今天的東京，其實是從一場幾乎摧毀整座城市的災難之後重新長出來的，你會相信嗎？"
+
+The hook must immediately establish why the viewer should care.
+
+1. Geography / Context
+
+Where is this place?
+
+Why does its location matter?
+
+How does geography influence:
+
+trade
+defense
+migration
+climate
+ports
+transportation
+urban development
+2. HISTORY
+
+Explain the most important historical events that shaped the destination.
+
+Do NOT attempt to teach the entire history.
+
+Select only historical events that explain the present.
+
+3. CITY
+
+Explain:
+
+urban structure
+population
+neighborhoods
+transportation
+architecture
+city planning
+growth
+major districts
+
+The goal is:
+
+"Now I understand how this city works."
+
+4. BUSINESS
+
+This is a key differentiator of the channel.
+
+Explain:
+
+major industries
+trade
+companies
+finance
+ports
+manufacturing
+technology
+tourism
+economic policy
+global connections
+
+The question should often be:
+
+"How does this city/country make money?"
+
+or:
+
+"Why did this industry develop here?"
+
+5. CULTURE
+
+Explain how history + city + business shaped:
+
+food
+lifestyle
+language
+art
+entertainment
+religion
+social norms
+architecture
+popular culture
+
+Culture should NOT be treated as an isolated section.
+
+Show its connection to the previous sections.
+
+6. ATTRACTIONS
+
+Only after viewers understand the destination should we discuss major attractions.
+
+The attractions should now make more sense.
+
+Instead of:
+
+"這裡有東京鐵塔，非常漂亮。"
+
+Prefer:
+
+"理解了東京戰後的城市發展，你再看東京鐵塔，就會發現它其實不只是一個地標，而是某個時代的城市象徵。"
+
+This is a fundamental editorial principle.
+
+19. RESEARCH AGENT
+
+The Research Agent must collect:
+
+historical information
+geography
+population
+urban development
+economic data
+industries
+major companies
+cultural information
+attractions
+transportation
+major events
+geopolitical context when relevant
+
+Sources should prioritize:
+
+Government sources
+Official statistics
+Academic sources
+International organizations
+Reputable news organizations
+High-quality books/articles
+Official tourism boards
+Primary sources
+
+Avoid relying on:
+
+random blogs
+SEO farms
+unsourced social media
+AI-generated articles
+Wikipedia as the sole source
+
+Wikipedia may be used as a starting point but must not be the final authority for important factual claims.
+
+20. FACT-CHECK AGENT
+
+Every important factual claim must be checked.
+
+Pay special attention to:
+
+population
+GDP
+dates
+historical events
+rankings
+company information
+statistics
+geographical claims
+political claims
+economic claims
+
+Each major claim should have:
+
+claim
+source
+source_url
+source_date
+confidence
+
+If a claim cannot be sufficiently verified:
+
+remove it
+qualify it
+or flag it for human review
+
+Never fabricate statistics.
+
+21. SOURCE AND COPYRIGHT TRACKING
+
+Every external visual and information source must be tracked.
+
+For each asset:
+
+asset_id
+source
+creator
+license
+license_url
+usage_rights
+date_acquired
+attribution_required
+
+Do NOT scrape random images from Google Images.
+
+Do NOT download copyrighted YouTube footage without permission.
+
+Prefer:
+
+licensed stock footage
+public-domain material
+Creative Commons material where commercially usable
+official press/media assets where usage is permitted
+AI-generated visuals
+original maps
+original diagrams
+original charts
+original motion graphics
+22. VISUAL AGENT
+
+The Visual Agent should decide between:
+
+A. AI-generated visuals
+
+For:
+
+historical reconstruction
+cinematic establishing shots
+conceptual scenes
+impossible-to-source visuals
+B. Licensed / public-domain footage
+
+For:
+
+real city footage
+architecture
+street scenes
+cultural footage
+C. Maps
+
+For:
+
+geography
+historical expansion
+trade routes
+transportation
+borders
+D. Data visualization
+
+For:
+
+population
+GDP
+industry
+trade
+economic growth
+E. Motion graphics
+
+For:
+
+timelines
+comparisons
+geographic movement
+business flows
+
+Do NOT rely on 100% AI-generated video.
+
+Visual quality should be prioritized over maximum automation.
+
+23. SCRIPT AGENT
+
+The Script Agent must write in natural Traditional Chinese.
+
+The writing should be:
+
+conversational
+cinematic
+intelligent
+concise
+story-driven
+
+Avoid:
+
+excessive formal language
+textbook tone
+repetitive sentence structures
+obvious AI phrases
+unnecessary adjectives
+overexplaining
+
+Every section should answer:
+
+Why should the viewer care?
+
+The script should connect causes and consequences.
+
+Preferred narrative structure:
+
+Question → Context → History → Transformation → Business → Culture → What we see today
+
+24. STORYBOARD AGENT
+
+For each paragraph, generate:
+
+scene_id
+script_text
+visual_type
+visual_description
+camera_motion
+duration
+source_type
+source_reference
+transition
+on_screen_text
+map_required
+chart_required
+
+The storyboard should maintain visual variety.
+
+Avoid showing the same type of stock footage for 20 seconds.
+
+25. VOICE AGENT
+
+Generate natural Traditional Chinese narration.
+
+Voice characteristics:
+
+intelligent
+warm
+calm
+documentary
+curious
+slightly cinematic
+
+Avoid:
+
+exaggerated commercial voice
+robotic narration
+excessive enthusiasm
+unnatural pauses
+
+The system should automatically synchronize narration with the timeline.
+
+26. SUBTITLE SYSTEM
+
+Generate:
+
+Traditional Chinese subtitles
+optional English subtitles
+
+Subtitles should be synchronized at sentence or phrase level.
+
+Do not create extremely long subtitle lines.
+
+27. MUSIC AND SOUND
+
+Music should support the story.
+
+Possible styles:
+
+cinematic documentary
+ambient
+subtle orchestral
+cultural/world music
+modern documentary
+
+Avoid overly dramatic music for ordinary factual explanations.
+
+Music must be properly licensed.
+
+The system must track music licensing information.
+
+28. THUMBNAIL AGENT
+
+Generate multiple thumbnail concepts.
+
+At least:
+
+3 candidates
+
+Each candidate should be evaluated on:
+
+click appeal
+visual clarity
+destination recognition
+curiosity
+mobile readability
+brand consistency
+factual accuracy
+
+The thumbnail should generally contain:
+
+One dominant image
+A strong short phrase
+Destination recognition
+Small 世界先修課 / EP badge
+
+Do not fill the thumbnail with paragraphs.
+
+29. METADATA AGENT
+
+Generate:
+
+YouTube title
+description
+chapters
+tags
+keywords
+hashtags
+thumbnail
+optional pinned comment
+
+The description should explain the video's central thesis rather than merely listing keywords.
+
+30. DAILY TOPIC ENGINE
+
+The Topic Engine should automatically select topics.
+
+Prioritize destinations that have:
+
+strong historical stories
+interesting city development
+major business/economic stories
+distinctive culture
+recognizable attractions
+strong visual potential
+current viewer interest
+
+The system should avoid making every episode feel the same.
+
+Rotate between:
+
+global cities
+Asian cities
+European cities
+North American cities
+emerging cities
+countries
+regions
+
+The topic engine should maintain a topic database to prevent repetition.
+
+31. DAILY PRODUCTION PIPELINE
+
+Recommended pipeline:
+
+TOPIC SELECTION
+      ↓
+RESEARCH
+      ↓
+FACT CHECK
+      ↓
+SCRIPT
+      ↓
+SCRIPT REVIEW
+      ↓
+STORYBOARD
+      ↓
+VISUAL ASSET GENERATION / ACQUISITION
+      ↓
+VOICE GENERATION
+      ↓
+VIDEO EDITING
+      ↓
+SUBTITLES
+      ↓
+MUSIC / SOUND
+      ↓
+THUMBNAIL
+      ↓
+TITLE / DESCRIPTION / SEO
+      ↓
+QA
+      ↓
+YOUTUBE PRIVATE UPLOAD
+      ↓
+EMAIL APPROVAL
+      ↓
+USER APPROVES
+      ↓
+YOUTUBE PUBLIC
+32. DAILY SCHEDULE
+
+All scheduling must use:
+
+Asia/Taipei
+
+Target workflow:
+
+Previous evening
+
+18:00
+Topic selection
+
+19:00
+Research
+
+20:00
+Fact checking
+
+21:00
+Script
+
+22:00
+Storyboard + visual generation
+
+00:00
+Voice generation
+
+01:00
+Video rendering
+
+04:00
+QA
+
+05:00
+YouTube PRIVATE upload
+
+06:00
+YouTube processing verification
+
+07:00
+Final metadata / thumbnail verification
+
+08:00
+Approval email
+
+This schedule is configurable.
+
+The system should NEVER assume server timezone.
+
+Use timezone-aware scheduling.
+
+33. YOUTUBE UPLOAD STRATEGY
+
+Do NOT wait until user approval to upload the video.
+
+Instead:
+
+Upload completed video to YouTube as PRIVATE.
+Confirm YouTube processing.
+Store video ID.
+Send approval email.
+User clicks APPROVE.
+Change privacy status:
+private → public
+
+This reduces approval-to-public latency.
+
+Use the official YouTube API.
+
+Before implementation, research the latest official YouTube Data API documentation and current upload/privacy requirements.
+
+Do not rely on outdated API assumptions.
+
+34. EMAIL APPROVAL SYSTEM
+
+Every morning at 08:00 Asia/Taipei, send an email containing:
+
+episode number
+video title
+destination
+thumbnail preview
+short summary
+QA status
+YouTube private link
+APPROVE button
+REJECT button
+optional EDIT / REVIEW link
+
+Example:
+
+世界先修課 EP.12 已完成
+
+東京為什麼能成為世界之都？
+
+[Thumbnail]
+
+影片已完成製作並通過自動 QA。
+
+[觀看影片]
+
+[ APPROVE & PUBLISH ]
+
+[ REJECT ]
+35. APPROVAL SECURITY
+
+Approval links must NOT simply expose a predictable URL.
+
+Use:
+
+cryptographically secure random token
+one-time-use token
+expiration
+associated video ID
+associated episode ID
+audit log
+idempotent action
+HTTPS
+
+Example conceptual flow:
+
+/approve/<secure-token>
+
+The token must expire after a configurable period.
+
+If the user clicks APPROVE twice, the second action should not cause errors or duplicate publication.
+
+36. REJECT WORKFLOW
+
+If user clicks REJECT:
+
+The system should:
+
+Keep video PRIVATE.
+Record rejection.
+Ask for optional reason.
+Store feedback.
+Allow regeneration of:
+title
+thumbnail
+script
+selected scenes
+entire video
+
+The rejected video must never automatically become PUBLIC.
+
+37. STATE MACHINE
+
+Use explicit production states.
+
+Example:
+
+IDEA
+RESEARCHING
+RESEARCH_COMPLETE
+FACT_CHECKING
+FACT_CHECK_COMPLETE
+SCRIPTING
+SCRIPT_COMPLETE
+STORYBOARDING
+ASSET_GENERATION
+VOICE_GENERATION
+RENDERING
+QA
+READY_FOR_UPLOAD
+UPLOADING
+YOUTUBE_PROCESSING
+PRIVATE_READY
+APPROVAL_PENDING
+APPROVED
+PUBLISHED
+REJECTED
+REGENERATING
+FAILED
+
+Every state transition should be logged.
+
+38. DATABASE
+
+Design a database containing at least:
+
+episodes
+id
+episode_number
+topic
+destination
+title
+script
+status
+created_at
+updated_at
+published_at
+youtube_video_id
+research_sources
+id
+episode_id
+claim
+source_url
+source_type
+source_date
+confidence
+assets
+id
+episode_id
+asset_type
+source
+license
+license_url
+usage_rights
+file_path
+approvals
+id
+episode_id
+token_hash
+expires_at
+approved_at
+rejected_at
+status
+production_jobs
+id
+episode_id
+job_type
+status
+attempt
+started_at
+completed_at
+error
+costs
+id
+episode_id
+provider
+service
+estimated_cost
+actual_cost
+timestamp
+39. STORAGE
+
+Use object storage or equivalent.
+
+Separate:
+
+/raw
+/research
+/scripts
+/audio
+/assets
+/video
+/thumbnails
+/subtitles
+/final
+
+Keep production assets associated with episode IDs.
+
+40. OBSERVABILITY
+
+The system must log:
+
+pipeline status
+API requests
+failures
+retries
+rendering time
+AI generation cost
+video duration
+storage usage
+YouTube upload status
+email status
+approval status
+
+Create an admin dashboard showing:
+
+Today's episode
+Production status
+Current stage
+Estimated cost
+Actual cost
+QA status
+YouTube status
+Approval status
+41. ERROR HANDLING
+
+Every external service call must support:
+
+timeout
+retry
+exponential backoff
+maximum retry count
+structured error logging
+
+The pipeline should resume from the last successful stage.
+
+Do NOT restart the entire production pipeline because one image failed.
+
+Example:
+
+If image 17 fails:
+
+retry image 17
+
+not:
+
+restart entire video
+42. COST CONTROL
+
+Track cost by:
+
+episode
+AI provider
+image generation
+video generation
+voice
+transcription
+rendering
+storage
+API calls
+
+Allow configurable budgets.
+
+If a daily budget is exceeded:
+
+stop non-critical generation
+use fallback provider
+request human review
+or reduce visual complexity
+
+Do not silently exceed budget.
+
+43. PROVIDER ABSTRACTION
+
+Do not hard-code the entire architecture around one AI provider.
+
+Create interfaces such as:
+
+ResearchProvider
+LLMProvider
+ImageProvider
+VideoProvider
+VoiceProvider
+TranscriptionProvider
+StorageProvider
+EmailProvider
+YouTubeProvider
+
+This allows providers to be replaced later.
+
+44. AI AGENT ARCHITECTURE
+
+Use modular agents:
+
+Topic Agent
+
+Chooses destination/topic.
+
+Research Agent
+
+Collects information.
+
+Fact Check Agent
+
+Verifies claims.
+
+Script Agent
+
+Writes documentary narration.
+
+Storyboard Agent
+
+Converts script into scenes.
+
+Visual Agent
+
+Creates/acquires visuals.
+
+Voice Agent
+
+Creates narration.
+
+Edit Agent
+
+Constructs timeline.
+
+Thumbnail Agent
+
+Creates thumbnails.
+
+Metadata Agent
+
+Creates title/description/SEO.
+
+QA Agent
+
+Checks quality.
+
+YouTube Agent
+
+Uploads and publishes.
+
+Approval Agent
+
+Handles email approval.
+
+45. QUALITY GATE
+
+Before a video becomes PRIVATE_READY, verify:
+
+Content
+Is the story coherent?
+Does it follow HISTORY → CITY → BUSINESS → CULTURE → ATTRACTIONS?
+Is the hook strong?
+Are facts verified?
+Are there unsupported claims?
+Writing
+Natural Traditional Chinese?
+Not too academic?
+Not obviously AI-generated?
+No unnecessary repetition?
+Visual
+Visual matches narration?
+No obvious AI artifacts?
+No copyright concerns?
+Good visual variety?
+Audio
+Narration intelligible?
+Music not overpowering?
+No clipping?
+Correct synchronization?
+Branding
+世界先修課 branding present?
+Correct EP number?
+Correct slogan?
+Thumbnail follows brand system?
+Title contains:
+｜世界先修課 EP.xx
+Technical
+Correct resolution
+Correct frame rate
+Correct audio
+Correct subtitles
+Correct duration
+
+Only after all required checks pass should the video be uploaded to YouTube as PRIVATE.
+
+46. AI CONTENT DISCLOSURE
+
+Research current YouTube requirements regarding synthetic/altered content before implementation.
+
+If realistic AI-generated or altered content requires disclosure, implement the appropriate disclosure mechanism.
+
+Do not assume today's YouTube rules will remain unchanged.
+
+47. CURRENT API RESEARCH REQUIREMENT
+
+Before implementing external integrations, research the current official documentation for:
+
+YouTube Data API
+YouTube upload requirements
+YouTube privacy settings
+YouTube OAuth
+YouTube synthetic/altered content policies
+Gmail / email provider APIs
+chosen AI providers
+chosen storage provider
+chosen scheduling infrastructure
+
+Use official documentation wherever possible.
+
+Do not build based solely on outdated examples.
+
+48. TECHNOLOGY SELECTION
+
+Choose a practical stack.
+
+Potential architecture:
+
+Backend
+
+Python / FastAPI
+
+or
+
+TypeScript / Node.js
+
+Choose based on the actual repository and ecosystem.
+
+Database
+
+PostgreSQL
+
+Queue
+
+Redis / Celery / BullMQ / equivalent
+
+Storage
+
+S3-compatible object storage
+
+Rendering
+
+FFmpeg
+
+Scheduling
+
+Cron / Cloud Scheduler / Temporal / equivalent
+
+Frontend/Admin
+
+Next.js or equivalent
+
+Email
+
+Transactional email provider or Gmail API depending on architecture.
+
+Do not choose technologies simply because they are fashionable.
+
+Prioritize:
+
+reliability
+maintainability
+observability
+cost
+ease of deployment
+49. DEVELOPMENT PROCESS
+
+Before writing substantial code:
+
+Inspect repository.
+Inspect existing files.
+Inspect installed dependencies.
+Identify runtime environment.
+Identify deployment environment.
+Identify existing architecture.
+Identify available API keys/integrations.
+Research current official APIs.
+Produce architecture proposal.
+Produce implementation plan.
+Identify risks.
+Then begin implementation.
+
+Create:
+
+ARCHITECTURE.md
+IMPLEMENTATION_PLAN.md
+.env.example
+README.md
+50. MVP PHASES
+Phase 1 — Core pipeline
+
+Build:
+
+topic selection
+research
+script
+fact check
+basic visual generation
+voice
+FFmpeg rendering
+subtitles
+Phase 2 — Branding
+
+Build:
+
+世界先修課 logo system
+slogan
+title generator
+thumbnail generator
+EP numbering
+opening sequence
+channel metadata
+Phase 3 — YouTube
+
+Build:
+
+OAuth
+upload
+private status
+processing verification
+metadata
+thumbnail
+privacy update
+Phase 4 — Approval
+
+Build:
+
+email
+secure approval token
+APPROVE
+REJECT
+audit log
+Phase 5 — Automation
+
+Build:
+
+daily scheduling
+retries
+queue
+state machine
+monitoring
+Phase 6 — Optimization
+
+Build:
+
+cost tracking
+provider fallback
+content quality scoring
+analytics
+title/thumbnail experimentation
+dashboard
+51. CHANNEL BRAND CONSISTENCY RULE
+
+The most important brand rule:
+
+Every video must feel like it belongs to the same channel.
+
+Even if the destination changes from:
+
+Tokyo → Singapore → Istanbul → New York → Rome
+
+the viewer should immediately recognize:
+
+"這是世界先修課。"
+
+This recognition should come from:
+
+logo
+slogan
+typography
+title format
+EP system
+thumbnail layout
+narration tone
+editorial structure
+
+NOT from using the same destination imagery.
+
+52. BRAND LANGUAGE
+
+Preferred recurring language:
+
+看懂
+出發
+世界
+城市
+為什麼
+如何形成
+從哪裡開始
+怎麼變成今天這樣
+背後的故事
+背後的力量
+不只是
+原來如此
+
+Avoid excessive repetition.
+
+The system should sound natural, not like it is deliberately inserting brand keywords.
+
+53. TITLE EXAMPLES
+
+The system should aim for titles in this direction:
+
+Tokyo
+
+東京為什麼能成為世界之都？從江戶到今天的城市野心｜世界先修課 EP.01
+
+Singapore
+
+一個沒有天然資源的小國，為什麼能變成亞洲金融中心？｜世界先修課 EP.02
+
+Kyoto
+
+京都為什麼能活過千年？你看到的古都，其實是這樣形成的｜世界先修課 EP.03
+
+Osaka
+
+為什麼日本最會做生意的城市是大阪？｜世界先修課 EP.04
+
+Istanbul
+
+一座城市，為什麼能同時連接歐洲與亞洲？｜世界先修課 EP.05
+
+New York
+
+紐約憑什麼成為世界金融中心？從一座港口城市說起｜世界先修課 EP.06
+
+Dubai
+
+沙漠裡的城市，為什麼能變成全球商業中心？｜世界先修課 EP.07
+
+Seoul
+
+首爾為什麼能讓一個國家的文化席捲全世界？｜世界先修課 EP.08
+
+Notice that these titles combine:
+
+Travel curiosity + history + city + business + culture + a big question
+
+rather than simply:
+
+Destination + attractions
+
+54. TITLE GENERATION PRINCIPLE
+
+When deciding between:
+
+「新加坡旅遊介紹」
+
+and
+
+「一個沒有天然資源的小國，為什麼能變成亞洲金融中心？」
+
+Always prefer the second type.
+
+When deciding between:
+
+「東京十大景點」
+
+and
+
+「東京為什麼能成為世界之都？」
+
+Always prefer the second type.
+
+The channel sells:
+
+UNDERSTANDING
+
+not:
+
+ITINERARIES.
+55. FINAL USER EXPERIENCE
+
+The ideal experience is:
+
+Before watching
+
+"I am interested in Tokyo."
+
+↓
+
+After seeing the title
+
+"Wait, why did Tokyo become this important?"
+
+↓
+
+During the video
+
+"Oh, it connects history, geography, business, and culture."
+
+↓
+
+Near the end
+
+"Now the Tokyo Tower / Shibuya / Ginza / Imperial Palace actually makes more sense."
+
+↓
+
+After watching
+
+"Now I want to go there."
+
+This is the emotional and intellectual goal of the channel.
+
+56. AUTOMATED DAILY EXPERIENCE
+
+Every day:
+
+08:00 Asia/Taipei
+
+User receives:
+
+世界先修課今日 EP.XX 已完成
+
+with:
+
+title
+thumbnail
+summary
+video preview
+QA status
+APPROVE
+REJECT
+
+User clicks:
+
+APPROVE
+
+Then:
+
+PRIVATE
+↓
+PUBLIC
+
+The episode is published automatically.
+
+The user should not need to manually upload or configure YouTube.
+
+57. SUCCESS CRITERIA
+
+The project is successful when:
+
+The system can independently select a topic.
+It can research the topic.
+It can verify factual claims.
+It can produce a high-quality Traditional Chinese documentary script.
+
+The content follows:
+
+歷史 → 城市 → 商業 → 文化 → 景點
+
+It can generate/acquire appropriate visuals.
+It can generate natural narration.
+It can render a complete video.
+It can generate subtitles.
+It can generate a compelling thumbnail.
+It can generate an attractive title.
+The title contains:
+
+｜世界先修課 EP.xx
+
+The video visually follows the 世界先修課 brand.
+The video is uploaded to YouTube as PRIVATE.
+The user receives an approval email at 08:00 Asia/Taipei.
+Clicking APPROVE changes the video to PUBLIC.
+Rejected videos never become public automatically.
+Failures are recoverable.
+Costs are tracked.
+Every major production step is logged.
+The system can run repeatedly without manual intervention.
+58. MOST IMPORTANT CREATIVE PRINCIPLE
+
+Do not optimize the channel for:
+
+"How many attractions can we show?"
+
+Optimize it for:
+
+"How much can the viewer understand about this place in 10–15 minutes?"
+
+The final attraction is only the visible result.
+
+The real product is:
+
+A BETTER UNDERSTANDING OF THE WORLD.
+
+And the brand promise is:
+
+世界先修課
+先看懂世界，再出發。
+59. FIRST ACTION
+
+Do NOT immediately start writing the entire production system.
+
+First:
+
+Inspect the repository and environment.
+Identify existing code and infrastructure.
+Research current official API documentation for all required integrations.
+Determine which services require API keys.
+Propose the architecture.
+Create:
+ARCHITECTURE.md
+IMPLEMENTATION_PLAN.md
+.env.example
+Explain the recommended stack and why.
+Identify the MVP boundary.
+Identify the highest-risk components.
+Only after that, begin implementation.
+
+The system should be designed so that the first working version can produce ONE complete 世界先修課 episode from topic selection through YouTube PRIVATE upload and approval email.
+
+Do not over-engineer the first version, but do not build a throwaway prototype that cannot evolve into the autonomous daily production system described above.

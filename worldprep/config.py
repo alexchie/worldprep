@@ -1,0 +1,81 @@
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
+
+    timezone: str = "Asia/Taipei"
+    database_url: str = f"sqlite:///{(ROOT / 'data' / 'worldprep.db').as_posix()}"
+    storage_backend: str = "local"
+    storage_root: Path = ROOT / "storage"
+    log_dir: Path = ROOT / "logs"
+    target_video_length_minutes: int = 12
+    narration_chars_per_minute: int = 260
+
+    anthropic_api_key: str = ""
+    llm_model: str = "claude-opus-5-5"
+    llm_fast_model: str = "claude-haiku-4-5"
+    llm_effort: str = "high"
+
+    voice_provider: str = "edge"
+    azure_speech_key: str = ""
+    azure_speech_region: str = "eastasia"
+    voice_name: str = "zh-TW-HsiaoChenNeural"
+
+    pexels_api_key: str = ""
+    pixabay_api_key: str = ""
+    image_provider: str = "none"
+    openai_api_key: str = ""
+    openai_image_model: str = "gpt-image-1"
+
+    music_dir: Path = ROOT / "music"
+
+    google_client_secrets: Path = ROOT / "secrets" / "client_secret.json"
+    google_token_file: Path = ROOT / "secrets" / "google_token.json"
+    drive_folder_id: str = ""
+
+    imap_host: str = "imap.gmail.com"
+    topic_fallback: str = "skip"
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    email_from: str = ""
+    email_to: str = ""
+
+    subtitle_font: str = "Noto Sans CJK TC" if __import__("sys").platform != "win32" else "Microsoft JhengHei"
+
+    daily_budget_usd: float = 15.0
+    episode_budget_usd: float = 12.0
+
+    schedule_produce: str = "18:00"
+    schedule_email: str = "08:00"
+
+    font_bold: str = ""
+    font_regular: str = ""
+    ffmpeg_path: str = ""
+
+    mock: bool = False
+
+    @property
+    def target_chars(self) -> int:
+        return self.target_video_length_minutes * self.effective_chars_per_minute
+
+    @property
+    def effective_chars_per_minute(self) -> int:
+        import json
+
+        cal = ROOT / "data" / "calibration.json"
+        if cal.exists():
+            return int(json.loads(cal.read_text(encoding="utf-8")).get("chars_per_minute", self.narration_chars_per_minute))
+        return self.narration_chars_per_minute
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

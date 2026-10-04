@@ -1,0 +1,80 @@
+name: daily-produce
+
+on:
+  schedule:
+    - cron: "0 0-2,18-23 * * *"
+      timezone: "Asia/Taipei"
+  workflow_dispatch:
+    inputs:
+      destination:
+        description: "指定目的地（留空由 Topic Agent 選題）"
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  TIMEZONE: Asia/Taipei
+  DATABASE_URL: sqlite:///data/worldprep.db
+  STORAGE_ROOT: ./storage
+  GOOGLE_CLIENT_SECRETS: ./secrets/client_secret.json
+  GOOGLE_TOKEN_FILE: ./secrets/google_token.json
+  DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+  PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY }}
+  AZURE_SPEECH_REGION: ${{ vars.AZURE_SPEECH_REGION || 'eastasia' }}
+  VOICE_PROVIDER: ${{ vars.VOICE_PROVIDER || 'edge' }}
+  IMAGE_PROVIDER: ${{ vars.IMAGE_PROVIDER || 'none' }}
+  TARGET_VIDEO_LENGTH_MINUTES: ${{ vars.TARGET_VIDEO_LENGTH_MINUTES || '12' }}
+  DAILY_BUDGET_USD: ${{ vars.DAILY_BUDGET_USD || '15' }}
+  EPISODE_BUDGET_USD: ${{ vars.EPISODE_BUDGET_USD || '12' }}
+  SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.gmail.com' }}
+  SMTP_USER: ${{ secrets.SMTP_USER }}
+  SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+  EMAIL_TO: ${{ secrets.EMAIL_TO }}
+  TOPIC_FALLBACK: ${{ vars.TOPIC_FALLBACK || 'skip' }}
+
+jobs:
+  produce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    concurrency:
+      group: worldprep-state
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: System packages
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk ffmpeg
+      - run: pip install -r requirements.txt
+      - name: Write Google credentials
+        env:
+          CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+          TOKEN: ${{ secrets.GOOGLE_TOKEN_JSON }}
+        run: |
+          mkdir -p secrets data
+          printf '%s' "$CLIENT_SECRET" > secrets/client_secret.json
+          printf '%s' "$TOKEN" > secrets/google_token.json
+      - name: Pull state from Google Drive
+        run: python -m worldprep.cli ci-pull
+      - name: Produce episode
+        timeout-minutes: 330
+        env:
+          DEST: ${{ inputs.destination }}
+        run: python -m worldprep.cli ci-produce --destination "$DEST"
+      - name: Push state to Google Drive
+        if: always()
+        run: python -m worldprep.cli ci-push
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 14
