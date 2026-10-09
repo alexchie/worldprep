@@ -5,7 +5,7 @@ from typing import Any
 
 from .config import get_settings
 
-AREAS = ("raw", "research", "scripts", "audio", "assets", "video", "thumbnails", "subtitles", "final")
+AREAS = ("plan", "raw", "research", "scripts", "audio", "assets", "video", "thumbnails", "subtitles", "final")
 
 
 class StorageProvider:

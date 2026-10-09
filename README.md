@@ -22,7 +22,7 @@ Drive 結構（`DRIVE_FOLDER_ID` 指定的資料夾內）：
 
 ```
 世界先修課/EP.01_東京/   episode.mp4、thumbnail.jpg、thumbnail_candidates/、zh-Hant.srt、metadata.json、
-                         qa_report.json、title_candidates.json、script.txt、研究與查核資料
+                         qa_report.json、brief.json（本集企劃）、script.txt、研究與查核資料
 _system/                 資料庫、工作檔（續跑/重做用，通知後保留 7 天）、授權配樂
 ```
 

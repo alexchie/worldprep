@@ -6,6 +6,7 @@ from worldprep.db import init_db, session
 from worldprep.models import Episode
 from worldprep.pipeline import produce, regenerate, advance, send_daily_email
 from worldprep.providers import get_providers
+from worldprep.storage import get_storage
 
 
 def _outbox() -> list[Path]:
@@ -20,6 +21,11 @@ def test_full_mock_episode_delivery_and_daily_email():
         ep = s.get(Episode, eid)
         assert ep.status == "DELIVERED" and ep.qa_status == "PASS"
         assert re.search(r"｜世界先修課 EP\.\d{2}$", ep.title)
+        # 製作人的原標題被腳本審查判定不受支持，換成修正版；不合規的「旅遊攻略」不會成為備選
+        assert ep.title.startswith("東京為什麼能成為世界之都？從江戶")
+        meta = get_storage().read_json(eid, "final", "metadata.json")
+        assert meta["title"] == ep.title and meta["title_alternates"]
+        assert not any("旅遊攻略" in t for t in meta["title_alternates"])
         assert ep.drive_folder_url.startswith("file:")
         folder = get_settings().storage_root / "drive_mock" / "世界先修課" / f"EP.{ep.episode_number:02d}_東京"
         title = ep.title

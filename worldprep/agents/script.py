@@ -6,6 +6,7 @@ from ..db import session
 from ..models import Episode, ResearchSource
 from ..storage import get_storage
 from .prompts import EDITORIAL_DNA
+from .topic import brief_for, read_brief, set_title
 
 SECTION_ORDER = ["hook", "geography", "history", "city", "business", "culture", "attractions", "closing"]
 
@@ -54,10 +55,12 @@ REVIEW_SCHEMA = {
         "sounds_ai_generated": {"type": "boolean"},
         "unsupported_sentences": {"type": "array", "items": {"type": "string"}},
         "issues": {"type": "array", "items": {"type": "string"}},
+        "title_supported": {"type": "boolean"},
+        "title_fix": {"type": "string"},
         "score": {"type": "number"},
     },
     "required": ["pass", "coherent", "follows_structure", "hook_strong", "natural_taiwanese_chinese",
-                 "sounds_ai_generated", "unsupported_sentences", "issues", "score"],
+                 "sounds_ai_generated", "unsupported_sentences", "issues", "title_supported", "title_fix", "score"],
     "additionalProperties": False,
 }
 
@@ -119,7 +122,7 @@ def run(p, episode_id: int, feedback: str = "") -> None:
     notes = st.path(episode_id, "research", "notes.md").read_text(encoding="utf-8")
     system = f"{EDITORIAL_DNA}\n\n你是頻道首席紀錄片編劇。\n{SCRIPT_RULES}"
     base = (
-        f"目的地：{dest}\n本集核心問題：{angle}\n旁白總字數目標：約 {target} 字（依實測語速換算的 {get_settings().target_video_length_minutes} 分鐘）。\n\n"
+        f"目的地：{dest}\n本集核心問題：{angle}\n{brief_for(episode_id, 'script')}\n\n旁白總字數目標：約 {target} 字（依實測語速換算的 {get_settings().target_video_length_minutes} 分鐘）。\n\n"
         f"## 已查核事實（只能用這些具體數據）\n{fact_text}\n\n## 研究背景（脈絡參考，其中未查核的數字不可使用）\n{notes[:20000]}"
     )
     if feedback:
@@ -134,8 +137,11 @@ def run(p, episode_id: int, feedback: str = "") -> None:
             f"{EDITORIAL_DNA}\n\n你是嚴格的總編輯，負責腳本審查。",
             "審查以下旁白稿：故事是否連貫？是否遵循 歷史→城市→商業→文化→景點 的因果鏈？hook 是否夠強？"
             "是否有未被已查核事實支持的主張（列出原句）？是否是自然的台灣繁體中文、不學術、不像 AI 寫的？有無不必要的重複？"
+            "腳本是否走製作人指定的敘事弧線、開頭 15 秒是否做到要求？"
+            "title_supported：標題的每個承諾（數字、情緒詞、因果）是否都被已查核事實與腳本兌現；若否，title_fix 寫一個符合同一原型、"
+            "只承諾已兌現內容的修正版主標題（30 字以內，不含「｜世界先修課 EP.xx」），若是則留空字串。"
             "score 0-10，>=7.5 且無未支持主張才 pass。\n\n"
-            f"## 腳本\n{script_text(script)}",
+            f"{brief_for(episode_id, 'review')}\n\n## 腳本\n{script_text(script)}",
             REVIEW_SCHEMA, episode_id, effort="medium",
             cached_prefix=f"## 已查核事實（審查依據）\n{fact_text}",
         )
@@ -148,6 +154,9 @@ def run(p, episode_id: int, feedback: str = "") -> None:
                             base + "\n\n## 上一版腳本\n" + script_text(script) + "\n\n## 必須修正的問題\n- " + "\n- ".join(issues),
                             SCRIPT_SCHEMA, episode_id, effort="high")
 
+    brief = read_brief(episode_id)
+    if brief and review and not review["title_supported"] and review["title_fix"].strip():
+        set_title(episode_id, review["title_fix"].strip(), brief["archetype"], "腳本審查：原標題承諾未被查核事實支持")
     st.write_json(episode_id, "scripts", "script.json", script)
     st.write_json(episode_id, "scripts", "review.json", review)
     st.write_text(episode_id, "scripts", "script.txt", script_text(script))

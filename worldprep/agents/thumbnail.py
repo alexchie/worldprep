@@ -7,6 +7,7 @@ from ..models import Episode
 from ..render import cards
 from ..storage import get_storage
 from .prompts import EDITORIAL_DNA
+from .topic import brief_for
 
 CRITERIA = ["click_appeal", "visual_clarity", "destination_recognition", "curiosity", "mobile_readability",
             "brand_consistency", "factual_accuracy"]
@@ -65,7 +66,7 @@ def run(p, episode_id: int, feedback: str = "", force: bool = False) -> Path:
     listing = "\n".join(f"{sc['scene_id']}: {sc['visual_description']}" for sc in photo_scenes) or "（無照片，使用品牌底圖，scene_id 填空字串）"
     data = p.llm.json(
         "thumbnail", f"{EDITORIAL_DNA}\n\n你是 YouTube 縮圖設計師。品牌視覺：電影感、高對比、深海軍藍、暖金點綴、白色字、單一主體、極簡。",
-        f"影片標題：{meta['title']}\n目的地：{dest}\n\n請提出 3 個縮圖概念。phrase 為主大字（4–10 字，與標題互補而非重複，要讓人想問「為什麼？」），"
+        f"影片標題：{meta['title']}\n目的地：{dest}\n{brief_for(episode_id, 'visual')}\n\n請提出 3 個縮圖概念。phrase 為主大字（4–10 字，與標題互補而非重複，要讓人想問「為什麼？」），"
         "sub_phrase 為金色小標（2–8 字，可為目的地名或年份），scene_id 從下列畫面選一張最有辨識度的主視覺。不要寫成段落。每個面向 0–10 分。"
         + (f"\n製作人回饋：{feedback}" if feedback else "") + f"\n\n## 可用畫面\n{listing}",
         SCHEMA, episode_id, effort="low",

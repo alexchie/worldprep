@@ -4,6 +4,7 @@ from ..db import session
 from ..models import Episode, ResearchSource
 from ..storage import get_storage
 from .prompts import EDITORIAL_DNA, SOURCE_POLICY
+from .topic import brief_for
 
 SECTIONS = ["geography", "history", "city", "business", "culture", "attractions"]
 
@@ -45,7 +46,7 @@ def run(p, episode_id: int) -> None:
     if not st.exists(episode_id, "research", "notes.md"):
         system = f"{EDITORIAL_DNA}\n\n你是研究員。{SOURCE_POLICY}"
         prompt = (
-            f"目的地：{dest}\n本集核心問題：{angle}\n\n"
+            f"目的地：{dest}\n本集核心問題：{angle}\n\n{brief_for(episode_id, 'research')}\n\n"
             "請用網路搜尋，為一支 12 分鐘的紀錄片收集研究資料。只挑能解釋「今天的樣子」的關鍵事實，不要寫完整通史。\n"
             "涵蓋：地理位置為何重要（貿易、防禦、移民、氣候、港口、交通）；塑造今日的關鍵歷史事件；城市結構、人口、交通、建築、主要區域；"
             "主要產業、貿易、代表企業、金融、經濟政策與全球連結（這座城市怎麼賺錢、為什麼產業在這裡發展）；"

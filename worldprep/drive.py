@@ -213,7 +213,7 @@ def push_state() -> None:
 
 DELIVERABLES = [
     ("final", "episode.mp4"), ("thumbnails", "thumbnail.jpg"), ("subtitles", "zh-Hant.srt"),
-    ("final", "metadata.json"), ("final", "qa_report.json"), ("final", "title_candidates.json"),
+    ("final", "metadata.json"), ("final", "qa_report.json"), ("plan", "brief.json"),
     ("scripts", "script.txt"), ("scripts", "storyboard.json"), ("research", "notes.md"),
     ("research", "claims.json"), ("research", "factcheck.json"), ("assets", "manifest.json"),
 ]

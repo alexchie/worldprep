@@ -60,7 +60,8 @@ class MockLLM:
         if task == "script_review":
             return {"pass": True, "coherent": True, "follows_structure": True, "hook_strong": True,
                     "natural_taiwanese_chinese": True, "sounds_ai_generated": False, "unsupported_sentences": [],
-                    "issues": [], "score": 8.5}
+                    "issues": [], "title_supported": False, "title_fix": "東京為什麼能成為世界之都？從江戶到今天的城市野心",
+                    "score": 8.5}
         if task == "storyboard":
             sids = re.findall(r"^(s\d{3}) ", prompt, re.M)
             cycle = ["stock_video", "map", "archive_image", "chart", "stock_photo", "title_card"]
@@ -75,12 +76,17 @@ class MockLLM:
                             "chart": {"title": "東京發展里程碑", "unit": "年", "kind": "bar", "labels": ["江戶幕府", "明治維新", "東京鐵塔"],
                                       "values": [1603, 1868, 1958], "source": "Mock 官方資料", "claim_id": ids[0] if ids else 0}})
             return {"scenes": out}
-        if task == "titles":
-            mains = ["東京為什麼能成為世界之都？從江戶到今天的城市野心", "一座被災難重建的城市，為什麼變成世界之都？",
-                     "去東京之前，你一定要先搞懂這座城市", "東京旅遊攻略"] + [f"東京候選標題 {i}" for i in range(6)]
-            return {"candidates": [{"main_title": m, "pattern": "A",
-                                    "scores": {k: 9 - i * 0.5 for k in schema["properties"]["candidates"]["items"]["properties"]["scores"]["required"]},
-                                    "supported_by_video": True} for i, m in enumerate(mains)]}
+        if task == "topic_request":
+            titles = [{"main_title": "一座被災難摧毀兩次的城市，為什麼還能成為世界之都？", "archetype": "B"},
+                      {"main_title": "東京旅遊攻略", "archetype": "C"},
+                      {"main_title": "為什麼東京的鐵道，長成一個圓圈？", "archetype": "F"}]
+            if "titles" in schema["properties"] and len(schema["properties"]) == 1:
+                return {"titles": titles}
+            return {"destination": "東京", "region": "亞洲城市", "familiar_phenomenon": "山手線為什麼是一個圓",
+                    "archetype": "B", "core_question": "東京為什麼能成為世界之都？", "titles": titles,
+                    "narrative_arc": "災難 → 重建 → 鐵道骨架 → 企業集中 → 今天的東京", "opening_15s": "先講關東大地震後的東京幾乎歸零",
+                    "research_questions": ["德川幕府為何選江戶？"], "wow_details_to_verify": ["東京鐵塔 1958 年完工"],
+                    "script_direction": "每段都回到重建", "visual_direction": "東京鐵塔、山手線"}
         if task == "metadata":
             return {"description_intro": "東京為什麼能成為世界之都？這集從江戶幕府、明治維新、關東大地震一路看到今天的東京。",
                     "tags": ["東京", "Tokyo", "日本歷史", "城市發展", "世界先修課"], "keywords": ["東京"],

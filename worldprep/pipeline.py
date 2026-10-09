@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 
 from . import drive
 from .agents import edit, factcheck, metadata, notify, qa, research, script, storyboard, thumbnail, visual, voice
-from .agents.topic import select_topic
+from .agents.topic import retitle, select_topic
 from .db import audit, session, transition
 from .logging_setup import log
 from .models import Episode, ProductionJob
@@ -252,7 +252,8 @@ def regenerate(p: Providers, eid: int, target: str, feedback: str = "") -> None:
 
     if target in ("title", "thumbnail"):
         if target == "title":
-            metadata.run(p, eid, feedback, force=True)
+            retitle(p, eid, feedback)
+            metadata.run(p, eid, force=True)
         thumbnail.run(p, eid, feedback, force=True)
         restart, from_stage = S.RENDERING, "qa"
     else:
