@@ -10,6 +10,10 @@ from ..render.ffmpeg import media_duration, run_ffmpeg
 from ..retry import PermanentError, with_retry
 from .base import VoiceResult
 
+_EDGE = "silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.03"
+TRIM_SILENCE = f"{_EDGE},areverse,{_EDGE},areverse"
+MAX_CHARS_PER_SECOND = 9  # 正常旁白約每秒 4–5 字
+
 
 class AzureVoice:
     """Azure Speech REST TTS（官方 zh-TW 神經語音，SSML 控制語速與停頓）。"""
@@ -60,10 +64,15 @@ class EdgeVoice:
         mp3 = out.with_suffix(".mp3")
         asyncio.run(edge_tts.Communicate(text, self.voice, rate="-3%").save(str(mp3)))
         wav = out.with_suffix(".wav")
-        run_ffmpeg(["-i", str(mp3), "-ar", "48000", "-ac", "1", str(wav)])
+        # Edge 每段前後各帶約 0.2 / 0.9 秒靜音，段落接起來會變成一句一停；裁掉後由剪輯統一控制停頓
+        run_ffmpeg(["-i", str(mp3), "-af", TRIM_SILENCE, "-ar", "48000", "-ac", "1", str(wav)])
         mp3.unlink(missing_ok=True)
+        duration = media_duration(wav)
+        # 偶爾會回傳被截斷的音檔（沒有報錯），依字數檢查長度，太短就重試
+        if duration < len(text) / MAX_CHARS_PER_SECOND:
+            raise RuntimeError(f"Edge TTS 音檔過短：{duration:.1f}s / {len(text)} 字")
         costs.record(episode_id, "edge", "tts", 0.0, chars=len(text))
-        return VoiceResult(wav, media_duration(wav), len(text))
+        return VoiceResult(wav, duration, len(text))
 
 
 class MockVoice:

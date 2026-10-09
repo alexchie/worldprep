@@ -16,8 +16,8 @@ from ..render.ffmpeg import concat, image_clip, media_duration, run_ffmpeg, sile
 from ..storage import get_storage
 from .subtitles import build_srt
 
-GAP = 0.4
-SECTION_GAP = 0.8
+GAP = 0.35
+SECTION_GAP = 0.9
 BURN_SUBTITLES = True
 RENDER_WORKERS = max(1, (os.cpu_count() or 2) // 2)
 
@@ -107,7 +107,7 @@ def run(p, episode_id: int) -> None:
     tmp = vdir / "episode_tmp.mp4"
     run_ffmpeg([*inputs, "-filter_complex", f"{vf};{af}", "-map", "[v]", "-map", "[a]",
                 "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", "-r", "30",
-                "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", "-shortest", tmp.name], cwd=vdir)
+                "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", "-shortest", tmp.name], cwd=vdir)
     shutil.move(tmp, final)
 
     with session() as s:
