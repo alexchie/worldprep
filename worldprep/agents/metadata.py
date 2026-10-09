@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from sqlalchemy import select
 
 from ..brand import CHANNEL_DESCRIPTION, SLOGAN, format_title, validate_title
@@ -45,14 +47,20 @@ META_SCHEMA = {
     "additionalProperties": False,
 }
 
+TITLE_STYLE_DIR = Path(__file__).resolve().parents[2] / "video_title"
+
 TITLE_GUIDE = """標題規則：
-- 主標題要比一般教育/紀錄片標題更吸引人：製造好奇、提出問題、驚人矛盾、歷史謎團、商業洞察、「我從沒這樣想過」的感覺，讓人在知道答案前就想點。
-- 可參考模式：A 為什麼（為什麼東京能成為世界之都？）、B 出發之前（去新加坡之前，你一定要先搞懂這個國家）、C 矛盾（一個沒有天然資源的小國，為什麼能成為亞洲金融中心？）、
-  D 歷史轉變（從港口小城到世界金融中心，新加坡是怎麼做到的？）、E 商業（豐田為什麼改變了整個名古屋？）、F 城市身分（京都為什麼能活過千年？）、
-  G 地緣/地理（為什麼這座城市，注定成為東西方的交界？）、H 大問題（一座城市，為什麼可以決定一個國家的命運？）
-- 禁止：XX旅遊攻略、XX十大景點、XX必去景點、XX旅遊介紹、XX景點推薦、XX完整介紹。禁止不誠實的標題黨，標題必須被影片內容支持。
-- main_title 不要包含「｜世界先修課 EP.xx」，系統會自動加上。main_title 建議 14–34 字。
+- 依照下方「標題與內容風格指南」：標題必須屬於七種原型（A–G）之一，pattern 欄位只填原型代號；兩段式結構，鉤子放在前 20 字。
+- 範本標題只用來學套路與節奏，不得照抄或只替換名詞。
+- 禁止：XX旅遊攻略、XX十大景點、XX必去景點、XX旅遊介紹、XX景點推薦、XX完整介紹。禁止不誠實的標題黨，標題的每個承諾（含情緒詞、數字）都必須被影片內容支持。
+- main_title 不要包含「｜世界先修課 EP.xx」，系統會自動加上，所以 main_title 控制在 30 字以內。
 - 每個面向 0–10 分。"""
+
+
+def title_style() -> str:
+    """頻道主提供的標題風格指南與範本標題（video_title/ 底下的 .md），每次產生標題都會重新讀取。"""
+    files = sorted(TITLE_STYLE_DIR.glob("*.md"), key=lambda f: f.name != "style_guide.md")
+    return "\n\n".join(f.read_text(encoding="utf-8").strip() for f in files)
 
 
 def _score(c: dict) -> float:
@@ -68,8 +76,9 @@ def generate_title(p, episode_id: int, feedback: str = "") -> dict:
         ep = s.get(Episode, episode_id)
         dest, n = ep.destination, ep.episode_number
     prompt = (f"目的地：{dest}\n本集論點：{script['thesis']}\n\n## 腳本\n" + st.path(episode_id, "scripts", "script.txt").read_text(encoding="utf-8")
-              + "\n\n產生至少 10 個不同模式的候選主標題並逐一評分。" + (f"\n\n製作人回饋：{feedback}" if feedback else ""))
-    data = p.llm.json("titles", f"{EDITORIAL_DNA}\n\n你是頻道的標題策略師。\n{TITLE_GUIDE}", prompt, TITLE_SCHEMA, episode_id, effort="medium")
+              + "\n\n產生至少 10 個候選主標題，至少涵蓋 2 種原型，並逐一評分。" + (f"\n\n製作人回饋：{feedback}" if feedback else ""))
+    data = p.llm.json("titles", f"{EDITORIAL_DNA}\n\n你是頻道的標題策略師。\n{TITLE_GUIDE}\n\n{title_style()}", prompt, TITLE_SCHEMA,
+                      episode_id, effort="medium")
     ranked = []
     for c in data["candidates"]:
         full = format_title(c["main_title"], n)
@@ -142,7 +151,9 @@ def run(p, episode_id: int, feedback: str = "", force: bool = False) -> dict:
             break
         tags.append(tag)
         total += len(tag) + 2
-    out = {"title": best["full_title"], "main_title": best["main_title"], "description": description, "tags": tags,
+    alternates = [c["full_title"] for c in st.read_json(episode_id, "final", "title_candidates.json")[1:]
+                  if not c["errors"] and c["supported_by_video"]][:2]
+    out = {"title": best["full_title"], "main_title": best["main_title"], "title_alternates": alternates, "description": description, "tags": tags,
            "keywords": meta["keywords"], "hashtags": meta["hashtags"], "pinned_comment": meta["pinned_comment"],
            "chapters": [{"t": t, "label": h} for t, h in chs], "slogan": SLOGAN, "thesis": script["thesis"]}
     st.write_json(episode_id, "final", "metadata.json", out)

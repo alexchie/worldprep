@@ -32,9 +32,10 @@ def episode_email(eid: int) -> tuple[str, str, str]:
         minutes = (ep.duration_seconds or 0) / 60
         requested = ep.requested_topic
     tags = ", ".join(meta["tags"])
+    alternates = "\n".join(meta.get("title_alternates", []))
     checklist = [
         "上傳 episode.mp4",
-        "貼上標題與說明（下方）",
+        "貼上標題與說明（下方）；也可改用備選標題",
         "縮圖：thumbnail.jpg（thumbnail_candidates 內有其他候選）",
         "字幕：上傳 zh-Hant.srt（影片已燒錄中文字幕，此檔供 YouTube CC 與搜尋使用）",
         f"標籤：{tags}",
@@ -55,6 +56,7 @@ def episode_email(eid: int) -> tuple[str, str, str]:
 {folder_html}{warn_html}
 {f'<p style="color:#556">本集主題來自你的指定：「{html.escape(requested)}」</p>' if requested else ""}
 {_section("YouTube 標題", meta["title"])}
+{_section("備選標題", alternates) if alternates else ""}
 {_section("YouTube 說明", meta["description"])}
 {_section("標籤", tags)}
 {_section("置頂留言（建議）", meta.get("pinned_comment", ""))}
@@ -64,7 +66,8 @@ def episode_email(eid: int) -> tuple[str, str, str]:
 <p style="color:#889;font-size:12px">不滿意要重做：GitHub → Actions → regenerate → episode_id 填 <b>{eid}</b>，選擇要重做的部分（標題 / 縮圖 / 腳本 / 指定場景 / 整支影片）。</p>
 </div></div>"""
     text = (f"{CHANNEL_NAME} {ep_label(n)} 已完成\n\nDrive：{folder}\nQA：{qa}\n\n【YouTube 標題】\n{meta['title']}\n\n"
-            f"【YouTube 說明】\n{meta['description']}\n\n【標籤】\n{tags}\n\n【置頂留言】\n{meta.get('pinned_comment', '')}\n\n"
+            + (f"【備選標題】\n{alternates}\n\n" if alternates else "")
+            + f"【YouTube 說明】\n{meta['description']}\n\n【標籤】\n{tags}\n\n【置頂留言】\n{meta.get('pinned_comment', '')}\n\n"
             "【上傳檢查清單】\n" + "\n".join(f"- {x}" for x in checklist)
             + f"\n\n{REQUEST_HINT}\n重做：GitHub Actions → regenerate，episode_id = {eid}")
     subject = f"{CHANNEL_NAME} {ep_label(n)} 已完成：{meta['main_title']}"
