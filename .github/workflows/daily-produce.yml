@@ -2,8 +2,8 @@ name: daily-produce
 
 on:
   schedule:
-    - cron: "0 0-2,18-23 * * *"
-      timezone: "Asia/Taipei"
+    # UTC 10:17–22:17 = 台北 18:17–06:17，每小時檢查一次（新集數只在 18:00 後開一次，未完成的集數會續跑）
+    - cron: "17 10-22 * * *"
   workflow_dispatch:
     inputs:
       destination:

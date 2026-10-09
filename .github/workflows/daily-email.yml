@@ -2,8 +2,8 @@ name: daily-email
 
 on:
   schedule:
-    - cron: "0 8 * * *"
-      timezone: "Asia/Taipei"
+    # UTC 23:45 = 台北 07:45；GitHub 排程常延遲數分鐘，提早觸發讓信在 08:00 前後寄達
+    - cron: "45 23 * * *"
   workflow_dispatch:
 
 permissions:

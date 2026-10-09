@@ -46,21 +46,30 @@ def _ai(p, sc: dict, out: Path, episode_id: int) -> ImageResult | None:
 
 
 SLIDE_STYLE = (
-    "Create one 16:9 slide for a cinematic documentary on a Taiwanese YouTube channel about why places became what they are. "
-    "Visual style: full-bleed, photorealistic or archival-photo look of the exact period and place described, "
-    "deep navy (#0b1b3a) shadows with warm gold (#d4a853) accents, editorial and elegant, consistent across the whole episode. "
-    "Text: show ONLY the headline given below (Traditional Chinese as used in Taiwan, exactly as written, large, top-left area) "
-    "and, if a key number is given, that number in gold. No other words, no paragraphs, no captions, no fake documents with writing, "
-    "no English, no logos, no watermark. Real historical people: never show a recognizable face (use back view, silhouette, "
-    "distance, or their objects). Maps: simple stylized silhouette with at most two place labels. "
+    "Create one 16:9 frame for a cinematic travel documentary on a Taiwanese YouTube channel about why places became what they are. "
+    "The real local place is the hero: a recognizable landmark, old street, temple, riverside, mountain view or cityscape of the exact "
+    "place and period described, shot like high-end travel photography (or an authentic archival photo for historical periods). "
+    "Full-bleed, natural light, rich detail, subtle deep navy (#0b1b3a) and warm gold (#d4a853) grading, consistent across the episode. "
+    "No fake documents with writing, no English, no logos, no watermark. Real historical people: never show a recognizable face "
+    "(use back view, silhouette, distance, or their objects). Maps: simple stylized silhouette with at most two place labels. "
     "Keep the bottom 20% of the frame free of any text (subtitles go there)."
 )
 
 
+def slide_text(sc: dict) -> str:
+    head, number = sc.get("slide_headline", ""), sc.get("slide_number", "")
+    if not head and not number:
+        return "Text: none. Absolutely no words, letters or numbers anywhere in the image."
+    parts = [f"a small elegant place label \"{head}\" in the top-left corner"] if head else []
+    if number:
+        parts.append(f"the number \"{number}\" in gold")
+    return ("Text: show ONLY " + " and ".join(parts) + " (Traditional Chinese as used in Taiwan, exactly as written). "
+            "Keep text small so the place stays the focus. No other words.")
+
+
 def slide_prompt(sc: dict) -> str:
-    number = f"\nKey number (exactly): {sc['slide_number']}" if sc.get("slide_number") else ""
-    return (f"{SLIDE_STYLE}\n\nNarration (context only, do not write it on the slide):\n{sc['script_text']}\n\n"
-            f"Headline (exactly): {sc.get('slide_headline') or sc['heading']}{number}\nWhat to show: {sc['visual_description']}")
+    return (f"{SLIDE_STYLE}\n{slide_text(sc)}\n\nNarration (context only, do not write it on the image):\n{sc['script_text']}\n\n"
+            f"What to show: {sc['visual_description']}")
 
 
 SLIDE_CHECK_SCHEMA = {
@@ -107,12 +116,15 @@ def check_slides(p, scenes: dict[str, dict], slides: dict[str, ImageResult], epi
             small = st.path(episode_id, "assets", f"{sid}_check.jpg")
             Image.open(slides[sid].path).convert("RGB").resize((768, 432)).save(small, quality=85)
             images.append(small)
-        listing = "\n".join(f"{j}: 大標「{scenes[sid].get('slide_headline') or scenes[sid]['heading']}」"
-                            f"{'，數字「' + scenes[sid]['slide_number'] + '」' if scenes[sid].get('slide_number') else '，無數字（number_correct 填 true）'}"
-                            f"；旁白：{scenes[sid]['script_text']}" for j, sid in enumerate(chunk))
+        def expected(sc: dict) -> str:
+            head = f"地名標籤「{sc['slide_headline']}」" if sc.get("slide_headline") else "沒有標籤（有任何文字就算 headline_correct=false）"
+            num = f"數字「{sc['slide_number']}」" if sc.get("slide_number") else "沒有數字（number_correct 填 true）"
+            return f"{head}，{num}"
+
+        listing = "\n".join(f"{j}: {expected(scenes[sid])}；旁白：{scenes[sid]['script_text']}" for j, sid in enumerate(chunk))
         v = p.llm.vision_json(
             "slide_check", "你是紀錄片的畫面審核員，只依圖片實際內容判斷。",
-            "依序檢查以下投影片（index 從 0 開始）。headline_correct：圖上大標是否與指定文字逐字相同；number_correct：數字是否逐字相同；"
+            "依序檢查以下投影片（index 從 0 開始）。headline_correct：圖上的地名標籤是否與指定文字逐字相同（指定沒有標籤時，圖上必須完全沒有字）；number_correct：數字是否逐字相同；"
             "extra_or_garbled_text：是否出現指定以外的文字或亂碼；recognizable_real_person_face：是否畫出可辨識的真實歷史人物臉孔；"
             "wrong_place_or_era：畫面時代或地點是否明顯與旁白不符。\n\n" + listing,
             images, SLIDE_CHECK_SCHEMA, episode_id,
