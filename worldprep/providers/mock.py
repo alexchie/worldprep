@@ -93,10 +93,12 @@ class MockLLM:
                     "tags": ["東京", "Tokyo", "日本歷史", "城市發展", "世界先修課"], "keywords": ["東京"],
                     "hashtags": ["#世界先修課", "#東京", "#城市紀錄片"], "pinned_comment": "你覺得東京最像哪個時代？"}
         if task == "thumbnail":
-            sid = (re.findall(r"^(s\d{3}):", prompt, re.M) or [""])[0]
-            crit = schema["properties"]["concepts"]["items"]["properties"]["scores"]["required"]
-            return {"concepts": [{"phrase": p, "sub_phrase": "東京", "scene_id": sid, "rationale": "",
-                                  "scores": {k: 8 - i for k in crit}} for i, p in enumerate(["災難造就的首都", "為什麼是東京？", "從江戶開始"])]}
+            return {"country": "日本", "city": "東京", "title_lines": ["為什麼東京", "能成為世界之都？"], "gold_keywords": ["世界之都"],
+                    "subtitle": "從江戶到未來", "core_question": "東京為什麼能成為世界之都", "direction": "綜合",
+                    "landmarks": ["東京鐵塔", "富士山"], "mood": "宏偉", "scene": "Tokyo Tower at dusk with Mount Fuji"}
+        if task == "title_judge":
+            picks = re.findall(r"^- \[([A-G])\] (.+)$", prompt, re.M)[:3]
+            return {"picks": [{"main_title": t, "archetype": a, "reason": "mock"} for a, t in picks]}
         raise KeyError(f"mock has no fixture for task {task}")
 
 
@@ -131,6 +133,9 @@ class MockSlides:
 
     def get(self, prompt: str, out: Path, episode_id: int | None = None) -> ImageResult:
         return self.generate_many({"x": (prompt, out)}, episode_id)["x"]
+
+    def compose(self, prompt: str, references: list, out: Path, episode_id: int | None = None) -> ImageResult:
+        return self.get(prompt, out, episode_id)
 
 
 class MockVideos:

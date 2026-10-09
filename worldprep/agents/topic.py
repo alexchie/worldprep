@@ -61,7 +61,13 @@ PRODUCER_ROLE = """你是本集的專案負責人（製作人）。你先決定�
 
 規則：
 - 嚴格依照下方「標題與內容風格指南」：從觀眾熟悉的現象切入，標題屬於七種原型（A–G）之一，腳本走該原型的敘事弧線。
-- titles：3 個主標題，最好的放第一個，至少涵蓋 2 種原型。不要包含「｜世界先修課 EP.xx」（系統會自動加上），每個控制在 30 字以內。
+- titles：12 個候選主標題（之後由總編輯挑 3 個），至少涵蓋 4 種原型。不要包含「｜世界先修課 EP.xx」（系統會自動加上），每個 28 字以內。
+  標題的第一眼吸引力來自「觀眾認得、而且覺得怪」的具體東西，不是抽象概念：
+  · 鉤子必須是具體的物件、現象、人物、數字或反差（例如「街上跑的是美軍吉普車」「滿街西班牙姓氏」「一張紙統治世界」），
+    最好直接取自 familiar_phenomenon，讓人看到就想問「對耶，為什麼？」。
+  · 禁止用抽象詞當鉤子：樞紐、交換站、面貌、發展、連結、歷史脈絡、城市魅力、轉變之路。
+  · 12 個要真的不一樣：換不同的切入物件與句型（為什麼／憑什麼／你以為…其實／從…到…／數字開頭／第二人稱），不要同一句話換幾個字。
+  · 範本標題只學套路，不可照抄或只替換名詞。
   此時還沒研究，標題裡的數字或專有事實必須是你有把握、且研究時會被查核的；之後若查核不支持，審查階段會改標題。
 - region：從 亞洲城市、歐洲城市、北美城市、新興城市、國家、地區、歐亞交界、大洋洲城市 中選一個。
 - research_questions：研究員要回答的 5–8 個具體問題，要能同時支撐標題的承諾與 歷史→城市→商業→文化→景點 的因果鏈。
@@ -86,14 +92,59 @@ def _recent() -> str:
         return "、".join(f"{e.destination}（{e.title or e.topic}）" for e in recent) or "（尚無）"
 
 
+JUDGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "picks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"main_title": {"type": "string"}, "archetype": {"type": "string", "enum": ARCHETYPES},
+                               "reason": {"type": "string"}},
+                "required": ["main_title", "archetype", "reason"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["picks"],
+    "additionalProperties": False,
+}
+
+
+def judge_titles(p, brief: dict, candidates: list[dict], episode_id: int | None = None) -> list[dict]:
+    """總編輯：站在滑手機的觀眾角度，從候選中挑出第一眼最想點的 3 個（可潤飾字句，不可改變事實）。"""
+    ref = (TITLE_STYLE_DIR / "reference_titles.md")
+    listing = "\n".join(f"- [{c['archetype']}] {c['main_title']}" for c in candidates)
+    r = p.llm.json(
+        "title_judge",
+        f"{EDITORIAL_DNA}\n\n你是頻道總編輯，負責挑標題。你的標準是：一個在 YouTube 首頁滑過去的台灣觀眾，"
+        "第一眼看到會不會停下來、覺得「這很有趣，我想知道答案」。下面是頻道主提供、實際表現很好的範本標題，請用同樣的嗅覺判斷。\n\n"
+        + (ref.read_text(encoding="utf-8") if ref.exists() else ""),
+        f"本集：{brief['destination']}\n觀眾熟悉的現象：{brief['familiar_phenomenon']}\n核心問題：{brief['core_question']}\n\n"
+        f"## 候選標題\n{listing}\n\n"
+        "挑出 3 個（最好的放第一），三個要是不同的切入點與原型。評判重點依序：\n"
+        "1. 鉤子是否具體、讓人覺得「怪」（物件、現象、人物、數字、反差），而不是抽象詞（樞紐、交換站、面貌、發展）；\n"
+        "2. 前 15 字內就看得懂、看得到鉤子（手機會截斷）；\n"
+        "3. 有沒有範本那種「我也好奇過」的感覺；\n"
+        "4. 影片能兌現，不誇大。\n"
+        "可以潤飾字句讓它更有力（28 字內，不含「｜世界先修課 EP.xx」），但不可加入候選中沒有的事實或數字。"
+        "如果候選都不夠好，可以根據觀眾熟悉的現象改寫出更好的版本。reason 用一句話說明為什麼會想點。",
+        JUDGE_SCHEMA, episode_id,
+    )
+    return [{"main_title": x["main_title"], "archetype": x["archetype"]} for x in r["picks"][:3]] or candidates[:3]
+
+
 def plan(p, request: str) -> dict:
-    """製作人：依指定主題產出本集企劃（核心問題、原型、標題、各同事的工作說明）。"""
-    return p.llm.json(
+    """製作人：依指定主題產出本集企劃（核心問題、原型、12 個候選標題、各同事的工作說明），再由總編輯挑出 3 個標題。"""
+    brief = p.llm.json(
         "topic_request", producer_system(),
         f"頻道主指定的下一集主題：「{request}」\n近期已製作：{_recent()}\n\n"
         "若頻道主已寫出角度或問題，保留其原意，不要改變主題。請寫出本集企劃。",
         BRIEF_SCHEMA,
     )
+    brief["title_pool"] = brief["titles"]
+    brief["titles"] = judge_titles(p, brief, brief["title_pool"])
+    return brief
 
 
 def full_titles(brief: dict, n: int) -> list[str]:
@@ -153,11 +204,12 @@ def retitle(p, episode_id: int, feedback: str = "") -> None:
     r = p.llm.json(
         "topic_request", producer_system(),
         f"本集原企劃：核心問題「{b['core_question']}」，原型 {b['archetype']}，原標題「{b['titles'][0]['main_title']}」。\n"
-        f"影片已完成，請依腳本重新下 3 個標題（只能承諾腳本有兌現的內容）。"
+        f"影片已完成，請依腳本重新下 12 個候選標題（只能承諾腳本有兌現的內容）。"
         + (f"\n頻道主回饋：{feedback}" if feedback else "") + f"\n\n## 腳本\n{script}",
         RETITLE_SCHEMA, episode_id,
     )
-    b["titles"] = r["titles"]
+    b["title_pool"] = r["titles"]
+    b["titles"] = judge_titles(p, b, r["titles"], episode_id)
     _save(episode_id, b)
 
 

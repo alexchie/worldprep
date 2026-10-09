@@ -1,72 +1,140 @@
-import shutil
 from pathlib import Path
 
-from ..brand import CHANNEL_NAME
+from PIL import Image
+
+from ..brand import CHANNEL_NAME, SLOGAN, ep_label
+from ..config import ROOT, get_settings
 from ..db import session
+from ..logging_setup import log
 from ..models import Episode
 from ..render import cards
 from ..storage import get_storage
-from .prompts import EDITORIAL_DNA
-from .topic import brief_for, read_brief
+from .topic import read_brief
 
-CRITERIA = ["click_appeal", "visual_clarity", "destination_recognition", "curiosity", "mobile_readability",
-            "brand_consistency", "factual_accuracy"]
+COVER_DIR = ROOT / "cover_sample"
+BRAND_EN = "WORLD WISE"
+TAGS = ["歷史", "城市", "商業", "文化", "景點"]
 
-SCHEMA = {
+PLAN_SCHEMA = {
     "type": "object",
     "properties": {
-        "concepts": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "phrase": {"type": "string"},
-                    "sub_phrase": {"type": "string"},
-                    "scene_id": {"type": "string"},
-                    "rationale": {"type": "string"},
-                    "scores": {"type": "object", "properties": {c: {"type": "number"} for c in CRITERIA},
-                               "required": CRITERIA, "additionalProperties": False},
-                },
-                "required": ["phrase", "sub_phrase", "scene_id", "rationale", "scores"],
-                "additionalProperties": False,
-            },
-        }
+        "country": {"type": "string"},
+        "city": {"type": "string"},
+        "title_lines": {"type": "array", "items": {"type": "string"}},
+        "gold_keywords": {"type": "array", "items": {"type": "string"}},
+        "subtitle": {"type": "string"},
+        "core_question": {"type": "string"},
+        "direction": {"type": "string", "enum": ["歷史", "城市", "商業", "文化", "綜合"]},
+        "landmarks": {"type": "array", "items": {"type": "string"}},
+        "mood": {"type": "string"},
+        "scene": {"type": "string"},
     },
-    "required": ["concepts"],
+    "required": ["country", "city", "title_lines", "gold_keywords", "subtitle", "core_question", "direction", "landmarks",
+                 "mood", "scene"],
+    "additionalProperties": False,
+}
+
+CHECK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "single_thumbnail": {"type": "boolean"},
+        "title_exact": {"type": "boolean"},
+        "brand_exact": {"type": "boolean"},
+        "episode_exact": {"type": "boolean"},
+        "tags_exact": {"type": "boolean"},
+        "no_extra_or_garbled_text": {"type": "boolean"},
+        "landmarks_correct": {"type": "boolean"},
+        "note": {"type": "string"},
+    },
+    "required": ["single_thumbnail", "title_exact", "brand_exact", "episode_exact", "tags_exact", "no_extra_or_garbled_text",
+                 "landmarks_correct", "note"],
     "additionalProperties": False,
 }
 
 
-def rule_errors(c: dict, main_title: str) -> list[str]:
-    """縮圖文案的硬規則：主大字 4–10 字、不可重複標題、金色小標不可重複右上角的頻道/EP 徽章。"""
-    errors = []
-    phrase, sub = c["phrase"].strip(), c["sub_phrase"].strip()
-    if not 4 <= len(phrase) <= 10:
-        errors.append(f"主大字 {len(phrase)} 字")
-    if phrase in main_title or main_title.startswith(phrase[:6]):
-        errors.append("主大字重複標題")
-    if "EP" in sub.upper() or CHANNEL_NAME in sub or CHANNEL_NAME in phrase:
-        errors.append("文案重複頻道徽章")
-    return errors
+def cover_memory() -> str:
+    """頻道主的封面規範（cover_sample/*.md），每次製作都重新讀取。"""
+    return "\n\n".join(f.read_text(encoding="utf-8").strip() for f in sorted(COVER_DIR.glob("*.md")))
 
 
-def _slide_background(p, episode_id: int, dest: str) -> Path | None:
-    """投影片上已有大標，不適合再疊縮圖文案；另外生成一張無字的主視覺當縮圖背景。"""
+def cover_references() -> list[Path]:
+    return sorted(f for f in COVER_DIR.iterdir() if f.suffix.lower() in (".png", ".jpg", ".jpeg")) if COVER_DIR.exists() else []
+
+
+def plan_cover(p, episode_id: int, meta: dict, dest: str, n: int, feedback: str = "") -> dict:
+    """依標題與企劃，填好封面規範第十一節的「本次任務輸入資料」。"""
+    b = read_brief(episode_id) or {}
+    return p.llm.json(
+        "thumbnail", f"你是《{CHANNEL_NAME}》的縮圖藝術總監。以下是頻道主的封面規範，請嚴格遵守。\n\n{cover_memory()}",
+        f"請為本集填寫封面的「本次任務輸入資料」。\n\n集數：{ep_label(n)}\nYouTube 完整影片標題：{meta['title']}\n目的地：{dest}\n"
+        f"核心問題：{b.get('core_question', meta.get('thesis', ''))}\n畫面方向：{b.get('visual_direction', '')}\n\n"
+        "欄位說明：\n"
+        "- title_lines：縮圖主標題，分成 2–3 行（每行 4–11 字）。從上架標題取出最有吸引力的問題與關鍵詞，"
+        "可以精簡，但不可加入標題沒有的事實；要像範本那樣是一個讓人想知道答案的問題。\n"
+        "- gold_keywords：title_lines 中要用金色強調的 1–2 個詞，必須逐字出現在 title_lines 裡。\n"
+        "- subtitle：一行內的副標（12 字內）；不需要時填空字串。\n"
+        "- direction：本集主要方向。landmarks：2–4 個一定要出現、且真的位於該地的地標或視覺元素。\n"
+        "- mood：希望呈現的情緒。scene：用英文描述一個具體的主視覺構圖（哪個地標、時間、光線、角度），"
+        "要一眼看出是哪個城市，且呼應本集故事，不要只是把範本的地標換掉。"
+        + (f"\n\n頻道主回饋：{feedback}" if feedback else ""),
+        PLAN_SCHEMA, episode_id,
+    )
+
+
+def cover_prompt(plan: dict, n: int) -> str:
+    title = "\n".join(plan["title_lines"])
+    gold = "、".join(plan["gold_keywords"]) or "（無）"
+    return (
+        f"{cover_memory()}\n\n"
+        "## 本次任務輸入資料\n"
+        f"【國家】：{plan['country']}\n【城市或地區】：{plan['city']}\n【集數】：{ep_label(n)}\n"
+        f"【縮圖主標題】（逐字照抄，分行如下）：\n{title}\n【金色關鍵詞】：{gold}\n"
+        f"【副標題】：{plan['subtitle'] or '無'}\n【影片核心問題】：{plan['core_question']}\n【本集主要方向】：{plan['direction']}\n"
+        f"【必須出現的地標或視覺元素】：{'、'.join(plan['landmarks'])}\n【希望呈現的情緒】：{plan['mood']}\n"
+        f"【主視覺構圖】：{plan['scene']}\n"
+        f"【其他限制】：左上角品牌固定為「{CHANNEL_NAME}」「{BRAND_EN}」「{SLOGAN}」；底部五個標籤固定為「{'｜'.join(TAGS)}」；"
+        "除上述文字與主標題、副標題外不得有任何其他文字。附上的參考圖是系列設計規範，只輸出一張全新的單集縮圖。"
+    )
+
+
+def check_cover(p, image: Path, plan: dict, n: int, episode_id: int) -> dict:
+    if not hasattr(p.llm, "vision_json"):
+        return {"ok": True, "note": ""}
+
+    v = p.llm.vision_json(
+        "cover_check", "你是封面校對員，逐字核對圖片上實際出現的文字，不要猜測。",
+        f"指定主標題（逐字）：{''.join(plan['title_lines'])}\n副標題：{plan['subtitle'] or '無'}\n"
+        f"品牌：{CHANNEL_NAME}／{BRAND_EN}／{SLOGAN}\n集數：{ep_label(n)}\n底部標籤：{'、'.join(TAGS)}\n"
+        f"應出現的地標：{'、'.join(plan['landmarks'])}（位於 {plan['city']}）\n\n"
+        "single_thumbnail：是否只有一張完整縮圖（不是九宮格或拼貼）。title_exact：主標題是否逐字正確（換行不影響）。"
+        "brand_exact／episode_exact／tags_exact：各自是否逐字正確。no_extra_or_garbled_text：是否沒有其他多餘文字、亂碼或簡體字。"
+        "landmarks_correct：地標是否正確、沒有錯誤拼接。note 寫出發現的問題。",
+        [image], CHECK_SCHEMA, episode_id,
+    )
+    v["ok"] = all(v[k] for k in CHECK_SCHEMA["required"] if k != "note")
+    return v
+
+
+def _finalize(src: Path, final: Path) -> Path:
+    """YouTube 縮圖：1280×720、JPEG、小於 2MB。"""
+    Image.open(src).convert("RGB").resize((1280, 720), Image.LANCZOS).save(final, quality=90, optimize=True)
+    return final
+
+
+def _fallback(p, episode_id: int, plan: dict, n: int, final: Path) -> Path:
+    """生圖寫不出正確的字時：照規範第九節，改生成無字底圖，再由程式排版文字。"""
     st = get_storage()
-    out = st.path(episode_id, "thumbnails", "background.jpg")
-    if out.exists():
-        return out
-    if not p.slides:
-        return None
-    b = read_brief(episode_id)
-    idea = b["visual_direction"] if b else dest
-    prompt = (f"A 16:9 cinematic YouTube thumbnail background about {dest}. One single bold subject, high contrast, "
-              f"deep navy and warm gold tones, empty space on the left third for large text. Absolutely no text, letters or logos. "
-              f"Real historical people: no recognizable faces.\nVisual direction: {idea}")
-    try:
-        return p.slides.get(prompt, out, episode_id).path
-    except Exception:
-        return None
+    bg = None
+    if p.slides:
+        prompt = (f"A 16:9 cinematic YouTube thumbnail background, no text, no letters, no logos. {plan['scene']}. "
+                  "Deep navy and warm gold grading, dramatic light, empty space on the left half for a large title.")
+        try:
+            bg = p.slides.get(prompt, st.path(episode_id, "thumbnails", "background"), episode_id).path
+        except Exception as e:
+            log.warning("cover_background_failed", extra={"episode_id": episode_id, "err": str(e)[:300]})
+    out = st.path(episode_id, "thumbnails", "fallback.jpg")
+    cards.thumbnail(bg, "".join(plan["title_lines"]), plan["subtitle"] or plan["city"], n, out)
+    return _finalize(out, final)
 
 
 def run(p, episode_id: int, feedback: str = "", force: bool = False) -> Path:
@@ -75,35 +143,27 @@ def run(p, episode_id: int, feedback: str = "", force: bool = False) -> Path:
     if final.exists() and not force:
         return final
     meta = st.read_json(episode_id, "final", "metadata.json")
-    manifest = st.read_json(episode_id, "assets", "manifest.json")
-    scenes = st.read_json(episode_id, "scripts", "storyboard.json")
     with session() as s:
         ep = s.get(Episode, episode_id)
         n, dest = ep.episode_number, ep.destination
-    photo_scenes = [sc for sc in scenes if manifest[sc["scene_id"]]["asset_type"] in ("stock_photo", "stock_video", "archive_image", "ai_image")
-                    and not manifest[sc["scene_id"]]["source"].startswith("original")]
-    listing = "\n".join(f"{sc['scene_id']}: {sc['visual_description']}" for sc in photo_scenes) or "（無照片，使用品牌底圖，scene_id 填空字串）"
-    data = p.llm.json(
-        "thumbnail", f"{EDITORIAL_DNA}\n\n你是 YouTube 縮圖設計師。品牌視覺：電影感、高對比、深海軍藍、暖金點綴、白色字、單一主體、極簡。",
-        f"影片標題：{meta['title']}\n目的地：{dest}\n{brief_for(episode_id, 'visual')}\n\n請提出 3 個縮圖概念。phrase 為主大字（4–10 字，與標題互補而非重複，要讓人想問「為什麼？」），"
-        "sub_phrase 為金色小標（2–8 字，可為目的地名或年份），scene_id 從下列畫面選一張最有辨識度的主視覺。不要寫成段落。每個面向 0–10 分。"
-        + (f"\n製作人回饋：{feedback}" if feedback else "") + f"\n\n## 可用畫面\n{listing}",
-        SCHEMA, episode_id, effort="low",
-    )
-    hero = _slide_background(p, episode_id, dest) if any(m["asset_type"] == "slide" for m in manifest.values()) else None
-    best, best_score = None, -1.0
-    for i, c in enumerate(data["concepts"][:5]):
-        m = manifest.get(c["scene_id"], {})
-        bg = str(hero) if hero else (m.get("poster") or m.get("file_path"))
-        out = st.path(episode_id, "thumbnails", f"candidate_{i + 1}.jpg")
-        cards.thumbnail(Path(bg) if bg else None, c["phrase"], c["sub_phrase"], n, out)
-        c["file"] = str(out)
-        c["total"] = sum(c["scores"].values()) / len(CRITERIA)
-        c["rule_errors"] = rule_errors(c, meta["main_title"])
-        if c["rule_errors"]:
-            c["total"] -= 10
-        if c["total"] > best_score:
-            best, best_score = c, c["total"]
-    st.write_json(episode_id, "thumbnails", "concepts.json", data["concepts"])
-    shutil.copy(best["file"], final)
-    return final
+    plan = plan_cover(p, episode_id, meta, dest, n, feedback)
+    attempts = []
+    if p.slides and hasattr(p.slides, "compose"):
+        prompt, refs = cover_prompt(plan, n), cover_references()
+        for i in range(get_settings().cover_attempts):
+            try:
+                raw = p.slides.compose(prompt, refs, st.path(episode_id, "thumbnails", f"raw_{i + 1}"), episode_id).path
+                img = _finalize(raw, st.path(episode_id, "thumbnails", f"candidate_{i + 1}.jpg"))
+            except Exception as e:
+                log.warning("cover_generation_failed", extra={"episode_id": episode_id, "err": str(e)[:300]})
+                break
+            check = check_cover(p, img, plan, n, episode_id)
+            attempts.append({"file": str(img), **check})
+            if check["ok"]:
+                break
+    st.write_json(episode_id, "thumbnails", "cover.json", {"plan": plan, "attempts": attempts})
+    good = next((a for a in attempts if a["ok"]), None)
+    if good:
+        return _finalize(Path(good["file"]), final)
+    log.warning("cover_fallback", extra={"episode_id": episode_id, "notes": [a["note"][:200] for a in attempts]})
+    return _fallback(p, episode_id, plan, n, final)

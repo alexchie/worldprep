@@ -16,7 +16,8 @@ MAX_PAUSE_CONTINUATIONS = 6
 # 每個工作用哪一級模型：opus（關鍵判斷）、sonnet（理解與撰寫）、haiku（抽取與清單檢查）
 TASK_TIER = {
     "topic": "sonnet",
-    "topic_request": "sonnet",  # 製作人：讀風格指南、定核心問題與標題、寫各同事的工作說明
+    "topic_request": "sonnet",  # 製作人：讀風格指南、定核心問題與候選標題、寫各同事的工作說明
+    "title_judge": "opus",  # 總編輯：從候選中挑第一眼最有趣的 3 個標題
     "research": "sonnet",
     "research_extract": "haiku",
     "factcheck": "opus",
@@ -28,6 +29,7 @@ TASK_TIER = {
     "metadata": "haiku",
     "thumbnail": "sonnet",
     "qa_vision": "haiku",
+    "cover_check": "sonnet",
     "slide_check": "haiku",
     "qa_vision_escalate": "opus",
 }
