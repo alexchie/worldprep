@@ -1,0 +1,38 @@
+name: smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: sqlite:///data/smoke.db
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      VOICE_NAME: zh-TW-HsiaoChenNeural
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: System packages
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk ffmpeg
+      - run: pip install -r requirements.txt
+      - name: Edge TTS / Pixabay / Wikimedia from GitHub runner
+        run: |
+          mkdir -p data
+          python - <<'EOF'
+          from pathlib import Path
+          from worldprep.db import init_db; init_db()
+          from worldprep.providers.voice import EdgeVoice
+          from worldprep.providers.images import PixabayVideos, WikimediaImages
+          r = EdgeVoice().synthesize("先看懂世界，再出發。", Path("data/voice"))
+          print("edge tts ok", round(r.duration, 1), "s")
+          print("pixabay video", bool(PixabayVideos().get("Taipei city street", Path("data/v"))))
+          print("wikimedia", bool(WikimediaImages().get("Taipei 1900 map", Path("data/w"))))
+          EOF

@@ -169,6 +169,16 @@ def _expired(ep) -> bool:
     return (datetime.now(timezone.utc) - at).days >= KEEP_WORK_DAYS
 
 
+def _work_filter(ti, delivered: bool):
+    """未完成集數：排除可重建的場景片段與合成檔；已交付集數：只保留文字、圖片等小檔（成品已在交付資料夾）。"""
+    name = ti.name.replace("\\", "/")
+    if delivered and name.endswith((".mp4", ".wav", ".mp3")):
+        return None
+    if name.endswith(".mp4") and ("/video/" in name or "/final/" in name):
+        return None
+    return ti
+
+
 def push_state() -> None:
     """收工後：上傳資料庫與工作檔（排除可重建的場景片段）；過期集數的工作檔刪除。"""
     from .db import engine, session
@@ -183,8 +193,8 @@ def push_state() -> None:
     (ROOT / "data").mkdir(parents=True, exist_ok=True)
     existing = dict((name, fid) for fid, name in d.list_names(work))
     with session() as s:
-        eps = [(e.id, _expired(e)) for e in s.scalars(select(Episode))]
-    for eid, expired in eps:
+        eps = [(e.id, _expired(e), e.status in ("DELIVERED", "NOTIFIED")) for e in s.scalars(select(Episode))]
+    for eid, expired, delivered in eps:
         name = f"ep{eid:04d}.tar.gz"
         if expired:
             if name in existing:
@@ -195,7 +205,7 @@ def push_state() -> None:
             continue
         tgz = ROOT / "data" / name
         with tarfile.open(tgz, "w:gz") as tf:
-            tf.add(src, arcname=src.name, filter=lambda ti: None if ("/video/s" in ti.name and ti.name.endswith(".mp4")) else ti)
+            tf.add(src, arcname=src.name, filter=lambda ti: _work_filter(ti, delivered))
         d.upload(tgz, work, name)
         tgz.unlink()
     log.info("drive_pushed_state")

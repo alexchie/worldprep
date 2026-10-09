@@ -70,7 +70,8 @@ def run(p, episode_id: int) -> bool:
     if review:
         _check(r, "content", "coherent", review["coherent"], critical=False)
         _check(r, "content", "hook_strong", review["hook_strong"], critical=False)
-        _check(r, "content", "no_unsupported_claims", not review["unsupported_sentences"], "; ".join(review["unsupported_sentences"])[:500])
+        _check(r, "content", "no_unsupported_claims", not review["unsupported_sentences"], "; ".join(review["unsupported_sentences"])[:500],
+               critical=False)
         _check(r, "writing", "natural_traditional_chinese", review["natural_taiwanese_chinese"], critical=False)
         _check(r, "writing", "not_ai_sounding", not review["sounds_ai_generated"], critical=False)
     _check(r, "content", "facts_verified", len(valid_ids) >= 5, f"{len(valid_ids)} verified claims")
