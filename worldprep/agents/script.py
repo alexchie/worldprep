@@ -135,8 +135,9 @@ def run(p, episode_id: int, feedback: str = "") -> None:
             "審查以下旁白稿：故事是否連貫？是否遵循 歷史→城市→商業→文化→景點 的因果鏈？hook 是否夠強？"
             "是否有未被已查核事實支持的主張（列出原句）？是否是自然的台灣繁體中文、不學術、不像 AI 寫的？有無不必要的重複？"
             "score 0-10，>=7.5 且無未支持主張才 pass。\n\n"
-            f"## 已查核事實\n{fact_text}\n\n## 腳本\n{script_text(script)}",
+            f"## 腳本\n{script_text(script)}",
             REVIEW_SCHEMA, episode_id, effort="medium",
+            cached_prefix=f"## 已查核事實（審查依據）\n{fact_text}",
         )
         issues += review["issues"] + [f"未支持的主張：{x}" for x in review["unsupported_sentences"]]
         if review["pass"] and not structural_issues(script, target, valid):

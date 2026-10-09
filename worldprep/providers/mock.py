@@ -38,7 +38,9 @@ class MockLLM:
     def text(self, task, system, prompt, episode_id=None, effort=None) -> str:
         return "mock"
 
-    def json(self, task: str, system: str, prompt: str, schema: dict, episode_id: int | None = None, effort: str | None = None):
+    def json(self, task: str, system: str, prompt: str, schema: dict, episode_id: int | None = None, effort: str | None = None,
+             cached_prefix: str | None = None):
+        prompt = (cached_prefix + "\n\n" if cached_prefix else "") + prompt
         ids = [int(x) for x in re.findall(r"^\[(\d+)\]", prompt, re.M)]
         if task == "topic":
             return {"choice_index": 0, "angle": "東京為什麼能成為世界之都？", "reason": "mock"}

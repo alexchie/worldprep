@@ -16,7 +16,7 @@
 
 **指定主題**：直接回覆任何一封通知信，寫下目的地或角度（例如「京都：為什麼能活過千年」）。18:00 開工前系統會讀取回覆，依收到順序排隊製作。只接受 `EMAIL_TO` 信箱寄出、且通過 Gmail 寄件人驗證、主旨含「世界先修課」的信。沒有指定時依 `TOPIC_FALLBACK`：`auto` 從選題池自動選題，`skip` 當天不製作。
 
-**模型分配**：研究、腳本（含審查與修改）用 `LLM_MODEL`（Claude Opus 5.5）；其餘 agent（選題、事實查核、分鏡、標題、說明、縮圖、QA 看片）用 `LLM_FAST_MODEL`（Claude Haiku 4.5）。
+**模型分配**：見 `worldprep/providers/llm_claude.py` 的 `TASK_TIER`。研究用 Sonnet＋網搜、事實查核用 Opus（不同模型互相把關）、腳本與腳本審查用 Opus，其餘用 Sonnet / Haiku。研究與選題以外的步驟走 Batch API（半價，單步等待上限 `BATCH_WAIT_MINUTES`，逾時自動改即時呼叫）；腳本審查的事實清單與網搜續傳使用 prompt caching。
 
 Drive 結構（`DRIVE_FOLDER_ID` 指定的資料夾內）：
 

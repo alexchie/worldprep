@@ -23,15 +23,19 @@ class BudgetExceeded(Exception):
     pass
 
 
-def llm_cost(model: str, usage) -> float:
+def llm_cost(model: str, usage, discount: float = 1.0) -> float:
+    """discount=0.5 為 Batch API 半價（只折 token 費，不折網路搜尋費）。快取寫入：5 分鐘 1.25 倍、1 小時 2 倍。"""
     pin, pout, pcache = LLM_PRICES.get(model, LLM_PRICES["claude-opus-5-5"])
     inp = getattr(usage, "input_tokens", 0) or 0
     out = getattr(usage, "output_tokens", 0) or 0
     cr = getattr(usage, "cache_read_input_tokens", 0) or 0
     cw = getattr(usage, "cache_creation_input_tokens", 0) or 0
+    cc = getattr(usage, "cache_creation", None)
+    cw_1h = (getattr(cc, "ephemeral_1h_input_tokens", 0) or 0) if cc else 0
     stu = getattr(usage, "server_tool_use", None)
-    searches = getattr(stu, "web_search_requests", 0) or 0 if stu else 0
-    return (inp * pin + cw * pin * 1.25 + cr * pcache + out * pout) / 1e6 + searches * WEB_SEARCH_PER_1K / 1000
+    searches = (getattr(stu, "web_search_requests", 0) or 0) if stu else 0
+    tokens = (inp * pin + (cw - cw_1h) * pin * 1.25 + cw_1h * pin * 2 + cr * pcache + out * pout) / 1e6
+    return tokens * discount + searches * WEB_SEARCH_PER_1K / 1000
 
 
 def record(episode_id: int | None, provider: str, service: str, actual: float, estimated: float | None = None, **detail) -> None:

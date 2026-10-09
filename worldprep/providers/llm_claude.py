@@ -13,8 +13,26 @@ from .base import ResearchResult
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 MAX_PAUSE_CONTINUATIONS = 6
 
-# 研究與腳本（含其審查、修改、事實整理）用主力模型；其餘工作用快速模型以節省成本
-MAIN_MODEL_TASKS = {"research", "research_extract", "script", "script_review", "script_revise"}
+# 每個工作用哪一級模型：opus（關鍵判斷）、sonnet（理解與撰寫）、haiku（抽取與清單檢查）
+TASK_TIER = {
+    "topic": "sonnet",
+    "topic_request": "sonnet",
+    "research": "sonnet",
+    "research_extract": "haiku",
+    "factcheck": "opus",
+    "factcheck_extract": "haiku",
+    "script": "opus",
+    "script_review": "opus",
+    "script_revise": "sonnet",
+    "storyboard": "sonnet",
+    "titles": "sonnet",
+    "metadata": "haiku",
+    "thumbnail": "sonnet",
+    "qa_vision": "haiku",
+    "qa_vision_escalate": "opus",
+}
+# 需要即時結果的工作不走 Batch；其餘在夜間排程中改用 Batch API（半價）
+SYNC_TASKS = {"research", "topic", "topic_request"}
 
 
 class ClaudeProvider:
@@ -22,48 +40,80 @@ class ClaudeProvider:
 
     def __init__(self):
         s = get_settings()
-        self.model = s.llm_model
-        self.fast_model = s.llm_fast_model
+        self.models = {"opus": s.llm_model, "sonnet": s.llm_sonnet_model, "haiku": s.llm_fast_model}
         self.effort = s.llm_effort
+        self.batch = s.batch_enabled
+        self.batch_wait = s.batch_wait_minutes * 60
         self.client = anthropic.Anthropic(api_key=s.anthropic_api_key or None, max_retries=4, timeout=900)
 
     def model_for(self, task: str) -> str:
-        return self.model if task in MAIN_MODEL_TASKS else self.fast_model
+        return self.models[TASK_TIER.get(task, "sonnet")]
 
     @staticmethod
     def _is_haiku(model: str) -> bool:
         return "haiku" in model
 
-    def _stream(self, task: str, episode_id: int | None, effort: str | None = None, fmt: dict | None = None, **kw):
-        model = self.model_for(task)
-        started = time.monotonic()
+    def _params(self, model: str, effort: str | None, fmt: dict | None, **kw) -> dict:
+        params = {"model": model, "max_tokens": 32000 if self._is_haiku(model) else 64000, **kw}
         output_config = {"format": fmt} if fmt else {}
+        if not self._is_haiku(model):
+            # Haiku 4.5 不支援 effort 與 adaptive thinking
+            params["thinking"] = {"type": "adaptive"}
+            output_config["effort"] = effort or self.effort
+        if output_config:
+            params["output_config"] = output_config
+        return params
+
+    def _sync(self, params: dict):
+        if self._is_haiku(params["model"]):
+            with self.client.messages.stream(**params) as stream:
+                return stream.get_final_message()
+        with self.client.beta.messages.stream(**params, betas=[FALLBACK_BETA], extra_body={"fallbacks": "default"}) as stream:
+            return stream.get_final_message()
+
+    def _batched(self, task: str, params: dict):
+        """單筆 Batch 請求：半價；超過等待上限就取消並改為即時呼叫，避免拖過交付時間。"""
+        batch = self.client.messages.batches.create(requests=[{"custom_id": task[:64], "params": params}])
+        deadline = time.monotonic() + self.batch_wait
+        while time.monotonic() < deadline:
+            time.sleep(15)
+            if self.client.messages.batches.retrieve(batch.id).processing_status == "ended":
+                for r in self.client.messages.batches.results(batch.id):
+                    if r.result.type == "succeeded":
+                        return r.result.message
+                    err = getattr(r.result, "error", None)
+                    err = getattr(err, "error", err)
+                    if r.result.type == "errored" and "invalid_request" in str(getattr(err, "type", "")):
+                        raise PermanentError(f"{task}: batch invalid request: {getattr(err, 'message', err)}")
+                    log.warning("batch_result_not_succeeded", extra={"task": task, "type": r.result.type})
+                return None
+        self.client.messages.batches.cancel(batch.id)
+        log.warning("batch_timeout_fallback_sync", extra={"task": task, "batch_id": batch.id})
+        return None
+
+    def _call(self, task: str, episode_id: int | None, effort: str | None = None, fmt: dict | None = None, **kw):
+        model = self.model_for(task)
+        params = self._params(model, effort, fmt, **kw)
+        started = time.monotonic()
+        discount = 1.0
+        msg = None
         try:
-            if self._is_haiku(model):
-                # Haiku 4.5：不支援 effort 與 adaptive thinking，也沒有 server-side fallback
-                if output_config:
-                    kw["output_config"] = output_config
-                with self.client.messages.stream(model=model, max_tokens=kw.pop("max_tokens", 32000), **kw) as stream:
-                    msg = stream.get_final_message()
-            else:
-                output_config["effort"] = effort or self.effort
-                with self.client.beta.messages.stream(
-                    model=model,
-                    max_tokens=kw.pop("max_tokens", 64000),
-                    betas=[FALLBACK_BETA],
-                    extra_body={"fallbacks": "default"},
-                    thinking={"type": "adaptive"},
-                    output_config=output_config,
-                    **kw,
-                ) as stream:
-                    msg = stream.get_final_message()
+            if self.batch and task not in SYNC_TASKS:
+                msg = self._batched(task, params)
+                discount = 0.5 if msg is not None else 1.0
+            if msg is None:
+                msg = self._sync(params)
         except (anthropic.BadRequestError, anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
             raise PermanentError(f"{task}: {e}") from e
-        usd = costs.llm_cost(model, msg.usage)
-        costs.record(episode_id, "anthropic", task, usd, model=msg.model,
-                     input_tokens=msg.usage.input_tokens, output_tokens=msg.usage.output_tokens)
-        log.info("llm_call", extra={"task": task, "model": model, "episode_id": episode_id, "stop_reason": msg.stop_reason,
-                                    "seconds": round(time.monotonic() - started, 1), "message_id": msg.id})
+        u = msg.usage
+        usd = costs.llm_cost(model, u, discount)
+        costs.record(episode_id, "anthropic", task, usd, model=msg.model, batch=discount < 1,
+                     input_tokens=u.input_tokens, output_tokens=u.output_tokens,
+                     cache_read=getattr(u, "cache_read_input_tokens", 0) or 0,
+                     cache_write=getattr(u, "cache_creation_input_tokens", 0) or 0)
+        log.info("llm_call", extra={"task": task, "model": model, "batch": discount < 1, "episode_id": episode_id,
+                                    "stop_reason": msg.stop_reason, "seconds": round(time.monotonic() - started, 1),
+                                    "cache_read": getattr(u, "cache_read_input_tokens", 0) or 0})
         if msg.stop_reason == "refusal":
             raise PermanentError(f"{task}: model refused ({getattr(msg, 'stop_details', None)})")
         if msg.stop_reason == "max_tokens":
@@ -74,40 +124,47 @@ class ClaudeProvider:
     def _text(msg) -> str:
         return "".join(b.text for b in msg.content if b.type == "text")
 
+    def _user(self, task: str, prompt: str, cached_prefix: str | None) -> list[dict]:
+        """cached_prefix：同一模型會重複送出的大段內容（例如已查核事實），放最前面並設 1 小時快取。"""
+        if not cached_prefix or self._is_haiku(self.model_for(task)):
+            return [{"role": "user", "content": (cached_prefix + "\n\n" if cached_prefix else "") + prompt}]
+        return [{"role": "user", "content": [
+            {"type": "text", "text": cached_prefix, "cache_control": {"type": "ephemeral", "ttl": "1h"}},
+            {"type": "text", "text": prompt},
+        ]}]
+
     def json(self, task: str, system: str, prompt: str, schema: dict, episode_id: int | None = None,
-             effort: str | None = None) -> Any:
-        msg = self._stream(
-            task, episode_id,
-            system=system,
-            messages=[{"role": "user", "content": prompt}],
-            effort=effort, fmt={"type": "json_schema", "schema": schema},
-        )
+             effort: str | None = None, cached_prefix: str | None = None) -> Any:
+        msg = self._call(task, episode_id, effort=effort, fmt={"type": "json_schema", "schema": schema},
+                         system=system, messages=self._user(task, prompt, cached_prefix))
         return json.loads(self._text(msg))
 
     def vision_json(self, task: str, system: str, prompt: str, images: list, schema: dict, episode_id: int | None = None) -> Any:
         import base64
 
-        content = []
-        for img in images:
-            content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
-                                                         "data": base64.standard_b64encode(img.read_bytes()).decode()}})
+        content = [{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                                 "data": base64.standard_b64encode(img.read_bytes()).decode()}}
+                   for img in images]
         content.append({"type": "text", "text": prompt})
-        msg = self._stream(task, episode_id, system=system, messages=[{"role": "user", "content": content}],
-                           effort="medium", fmt={"type": "json_schema", "schema": schema})
+        msg = self._call(task, episode_id, effort="medium", fmt={"type": "json_schema", "schema": schema},
+                         system=system, messages=[{"role": "user", "content": content}])
         return json.loads(self._text(msg))
 
     def text(self, task: str, system: str, prompt: str, episode_id: int | None = None, effort: str | None = None) -> str:
-        msg = self._stream(task, episode_id, effort=effort, system=system, messages=[{"role": "user", "content": prompt}])
-        return self._text(msg)
+        return self._text(self._call(task, episode_id, effort=effort, system=system,
+                                     messages=[{"role": "user", "content": prompt}]))
 
     def research(self, task: str, system: str, prompt: str, episode_id: int | None = None,
                  max_searches: int = 25) -> ResearchResult:
-        messages: list[dict] = [{"role": "user", "content": prompt}]
-        tool_type = "web_search_20250305" if self._is_haiku(self.model_for(task)) else "web_search_20260209"
+        model = self.model_for(task)
+        tool_type = "web_search_20250305" if self._is_haiku(model) else "web_search_20260209"
         tools = [{"type": tool_type, "name": "web_search", "max_uses": max_searches}]
+        # 搜尋達到伺服器迴圈上限（pause_turn）時會帶著同樣的前文續傳，自動快取讓續傳只付快取價
+        extra = {} if self._is_haiku(model) else {"cache_control": {"type": "ephemeral"}}
+        messages: list[dict] = [{"role": "user", "content": prompt}]
         content: list = []
         for _ in range(MAX_PAUSE_CONTINUATIONS):
-            msg = self._stream(task, episode_id, system=system, messages=messages, tools=tools)
+            msg = self._call(task, episode_id, system=system, messages=messages, tools=tools, **extra)
             content.extend(msg.content)
             if msg.stop_reason != "pause_turn":
                 break
@@ -124,8 +181,4 @@ class ClaudeProvider:
                     url = getattr(c, "url", None)
                     if url:
                         sources.setdefault(url, {"url": url, "title": getattr(c, "title", ""), "page_age": ""})
-        return ResearchResult(text=self._text_from(content), sources=list(sources.values()))
-
-    @staticmethod
-    def _text_from(content) -> str:
-        return "".join(b.text for b in content if b.type == "text")
+        return ResearchResult(text="".join(b.text for b in content if b.type == "text"), sources=list(sources.values()))

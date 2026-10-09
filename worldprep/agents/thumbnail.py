@@ -1,6 +1,7 @@
 import shutil
 from pathlib import Path
 
+from ..brand import CHANNEL_NAME
 from ..db import session
 from ..models import Episode
 from ..render import cards
@@ -35,6 +36,19 @@ SCHEMA = {
 }
 
 
+def rule_errors(c: dict, main_title: str) -> list[str]:
+    """縮圖文案的硬規則：主大字 4–10 字、不可重複標題、金色小標不可重複右上角的頻道/EP 徽章。"""
+    errors = []
+    phrase, sub = c["phrase"].strip(), c["sub_phrase"].strip()
+    if not 4 <= len(phrase) <= 10:
+        errors.append(f"主大字 {len(phrase)} 字")
+    if phrase in main_title or main_title.startswith(phrase[:6]):
+        errors.append("主大字重複標題")
+    if "EP" in sub.upper() or CHANNEL_NAME in sub or CHANNEL_NAME in phrase:
+        errors.append("文案重複頻道徽章")
+    return errors
+
+
 def run(p, episode_id: int, feedback: str = "", force: bool = False) -> Path:
     st = get_storage()
     final = st.path(episode_id, "thumbnails", "thumbnail.jpg")
@@ -64,6 +78,9 @@ def run(p, episode_id: int, feedback: str = "", force: bool = False) -> Path:
         cards.thumbnail(Path(bg) if bg else None, c["phrase"], c["sub_phrase"], n, out)
         c["file"] = str(out)
         c["total"] = sum(c["scores"].values()) / len(CRITERIA)
+        c["rule_errors"] = rule_errors(c, meta["main_title"])
+        if c["rule_errors"]:
+            c["total"] -= 10
         if c["total"] > best_score:
             best, best_score = c, c["total"]
     st.write_json(episode_id, "thumbnails", "concepts.json", data["concepts"])

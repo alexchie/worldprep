@@ -133,6 +133,10 @@ def run(p, episode_id: int) -> bool:
         prompt = "依序檢查以下影格（index 從 0 開始）與對應旁白是否相符、是否有明顯 AI 生成瑕疵（扭曲的手、亂碼文字、錯誤地標）、字卡是否可讀。最後一張是縮圖，檢查是否符合品牌（深藍、金色、白字、單一主體、EP 徽章、不雜亂）。\n\n" + \
                  "\n".join(f"{i}: {sc['text']}" for i, sc in enumerate(picks))
         v = p.llm.vision_json("qa_vision", EDITORIAL_DNA, prompt, frames + [thumb], VISION_SCHEMA, episode_id)
+        flagged = (any(f["ai_artifacts"] or not f["matches_narration"] for f in v["frames"]) or not v["thumbnail_on_brand"])
+        if flagged:
+            # Haiku 做清單式初檢；有疑慮才升級給 Opus 複核，避免誤報或漏報
+            v = p.llm.vision_json("qa_vision_escalate", EDITORIAL_DNA, prompt, frames + [thumb], VISION_SCHEMA, episode_id)
         bad = [f for f in v["frames"] if f["ai_artifacts"]]
         mismatch = [f for f in v["frames"] if not f["matches_narration"]]
         _check(r, "visual", "no_ai_artifacts", not bad, "; ".join(f["note"] for f in bad))

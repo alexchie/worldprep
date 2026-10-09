@@ -19,7 +19,10 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     llm_model: str = "claude-opus-5-5"
+    llm_sonnet_model: str = "claude-sonnet-5-5"
     llm_fast_model: str = "claude-haiku-4-5"
+    batch_enabled: bool = True
+    batch_wait_minutes: int = 30
     llm_effort: str = "high"
 
     voice_provider: str = "edge"
