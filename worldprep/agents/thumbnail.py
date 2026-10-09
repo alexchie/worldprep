@@ -12,7 +12,7 @@ from ..storage import get_storage
 from .topic import read_brief
 
 COVER_DIR = ROOT / "cover_sample"
-BRAND_EN = "WORLD WISE"
+BRAND_EN = "Beyond Travel"
 TAGS = ["歷史", "城市", "商業", "文化", "景點"]
 
 PLAN_SCHEMA = {
@@ -92,7 +92,8 @@ def cover_prompt(plan: dict, n: int) -> str:
         f"【副標題】：{plan['subtitle'] or '無'}\n【影片核心問題】：{plan['core_question']}\n【本集主要方向】：{plan['direction']}\n"
         f"【必須出現的地標或視覺元素】：{'、'.join(plan['landmarks'])}\n【希望呈現的情緒】：{plan['mood']}\n"
         f"【主視覺構圖】：{plan['scene']}\n"
-        f"【其他限制】：左上角品牌固定為「{CHANNEL_NAME}」「{BRAND_EN}」「{SLOGAN}」；底部五個標籤固定為「{'｜'.join(TAGS)}」；"
+        f"【其他限制】：左上角品牌固定為「{CHANNEL_NAME}」「{BRAND_EN}」「{SLOGAN}」"
+        f"（參考圖裡的舊英文品牌 WORLD WISE 已停用，一律寫「{BRAND_EN}」）；底部五個標籤固定為「{'｜'.join(TAGS)}」；"
         "除上述文字與主標題、副標題外不得有任何其他文字。附上的參考圖是系列設計規範，只輸出一張全新的單集縮圖。"
     )
 
