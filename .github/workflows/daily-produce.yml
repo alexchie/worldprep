@@ -24,6 +24,7 @@ env:
   PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
   PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
   AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY }}
   AZURE_SPEECH_REGION: ${{ vars.AZURE_SPEECH_REGION || 'eastasia' }}
   VOICE_PROVIDER: ${{ vars.VOICE_PROVIDER || 'edge' }}
