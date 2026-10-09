@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     image_provider: str = "none"
     openai_api_key: str = ""
     openai_image_model: str = "gpt-image-1"
+    gemini_api_key: str = ""
+    slide_model: str = "gemini-nano-banana-2.1"
+    slide_price_usd: float = 0.0504  # 2K，即時價；Batch 半價
+    slide_batch_wait_minutes: int = 60
 
     music_dir: Path = ROOT / "music"
 

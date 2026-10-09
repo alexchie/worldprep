@@ -7,7 +7,7 @@ from ..models import Episode
 from ..render import cards
 from ..storage import get_storage
 from .prompts import EDITORIAL_DNA
-from .topic import brief_for
+from .topic import brief_for, read_brief
 
 CRITERIA = ["click_appeal", "visual_clarity", "destination_recognition", "curiosity", "mobile_readability",
             "brand_consistency", "factual_accuracy"]
@@ -50,6 +50,25 @@ def rule_errors(c: dict, main_title: str) -> list[str]:
     return errors
 
 
+def _slide_background(p, episode_id: int, dest: str) -> Path | None:
+    """投影片上已有大標，不適合再疊縮圖文案；另外生成一張無字的主視覺當縮圖背景。"""
+    st = get_storage()
+    out = st.path(episode_id, "thumbnails", "background.jpg")
+    if out.exists():
+        return out
+    if not p.slides:
+        return None
+    b = read_brief(episode_id)
+    idea = b["visual_direction"] if b else dest
+    prompt = (f"A 16:9 cinematic YouTube thumbnail background about {dest}. One single bold subject, high contrast, "
+              f"deep navy and warm gold tones, empty space on the left third for large text. Absolutely no text, letters or logos. "
+              f"Real historical people: no recognizable faces.\nVisual direction: {idea}")
+    try:
+        return p.slides.get(prompt, out, episode_id).path
+    except Exception:
+        return None
+
+
 def run(p, episode_id: int, feedback: str = "", force: bool = False) -> Path:
     st = get_storage()
     final = st.path(episode_id, "thumbnails", "thumbnail.jpg")
@@ -71,10 +90,11 @@ def run(p, episode_id: int, feedback: str = "", force: bool = False) -> Path:
         + (f"\n製作人回饋：{feedback}" if feedback else "") + f"\n\n## 可用畫面\n{listing}",
         SCHEMA, episode_id, effort="low",
     )
+    hero = _slide_background(p, episode_id, dest) if any(m["asset_type"] == "slide" for m in manifest.values()) else None
     best, best_score = None, -1.0
     for i, c in enumerate(data["concepts"][:5]):
         m = manifest.get(c["scene_id"], {})
-        bg = m.get("poster") or m.get("file_path")
+        bg = str(hero) if hero else (m.get("poster") or m.get("file_path"))
         out = st.path(episode_id, "thumbnails", f"candidate_{i + 1}.jpg")
         cards.thumbnail(Path(bg) if bg else None, c["phrase"], c["sub_phrase"], n, out)
         c["file"] = str(out)

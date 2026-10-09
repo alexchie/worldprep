@@ -28,6 +28,7 @@ TASK_TIER = {
     "metadata": "haiku",
     "thumbnail": "sonnet",
     "qa_vision": "haiku",
+    "slide_check": "haiku",
     "qa_vision_escalate": "opus",
 }
 # 需要即時結果的工作不走 Batch；其餘在夜間排程中改用 Batch API（半價）

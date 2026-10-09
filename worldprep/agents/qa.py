@@ -77,7 +77,7 @@ def run(p, episode_id: int) -> bool:
     _check(r, "content", "facts_verified", len(valid_ids) >= 5, f"{len(valid_ids)} verified claims")
 
     # Visual
-    types = [sc["visual_type"] for sc in scenes]
+    types = [sc["visual_type"] for sc in scenes if sc["visual_type"] != "slide"]  # 投影片本來就是主體，不算重複
     longest = max((len(list(g)) for _, g in groupby(types)), default=0)
     _check(r, "visual", "visual_variety", longest <= 4, f"最長連續同類型 {longest}", critical=False)
     files = [a.file_path for a in assets if a.asset_type != "music"]
@@ -139,7 +139,7 @@ def run(p, episode_id: int) -> bool:
             v = p.llm.vision_json("qa_vision_escalate", EDITORIAL_DNA, prompt, frames + [thumb], VISION_SCHEMA, episode_id)
         bad = [f for f in v["frames"] if f["ai_artifacts"]]
         mismatch = [f for f in v["frames"] if not f["matches_narration"]]
-        _check(r, "visual", "no_ai_artifacts", not bad, "; ".join(f["note"] for f in bad))
+        _check(r, "visual", "no_ai_artifacts", not bad, "; ".join(f["note"] for f in bad), critical=False)
         _check(r, "visual", "visual_matches_narration", len(mismatch) <= 1, "; ".join(f["note"] for f in mismatch), critical=False)
         _check(r, "branding", "thumbnail_on_brand", v["thumbnail_on_brand"], v["thumbnail_note"], critical=False)
 

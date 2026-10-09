@@ -92,6 +92,20 @@ class Providers:
             return None
 
     @cached_property
+    def slides(self):
+        if self.mock:
+            from .mock import MockSlides
+
+            return MockSlides()
+        from .slides import GeminiSlides
+
+        try:
+            return GeminiSlides()
+        except PermanentError as e:
+            log.warning("slides_unavailable", extra={"reason": str(e)})
+            return None
+
+    @cached_property
     def email(self):
         from .email_smtp import OutboxEmail, SMTPEmail
 

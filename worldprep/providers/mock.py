@@ -64,11 +64,12 @@ class MockLLM:
                     "score": 8.5}
         if task == "storyboard":
             sids = re.findall(r"^(s\d{3}) ", prompt, re.M)
-            cycle = ["stock_video", "map", "archive_image", "chart", "stock_photo", "title_card"]
+            cycle = ["slide", "slide", "chart", "slide"]
             out = []
             for i, sid in enumerate(sids):
                 vt = cycle[i % len(cycle)]
                 out.append({"scene_id": sid, "visual_type": vt, "visual_description": f"東京畫面 {i}",
+                            "slide_headline": f"東京第{i + 1}幕", "slide_number": "",
                             "search_query": "Tokyo skyline", "ai_prompt": "", "realistic": False,
                             "camera_motion": ["zoom_in", "pan_left", "zoom_out", "pan_right"][i % 4], "transition": "fade",
                             "on_screen_text": "1868 明治維新" if i == 2 else "", "map_required": vt == "map",
@@ -115,6 +116,21 @@ class MockImages:
         img.save(out, quality=90)
         return ImageResult(path=out, source=f"{self.source}-{h % 10000}", creator="Mock Creator",
                            license=self.license, license_url="https://example.com/license", usage_rights="mock")
+
+
+class MockSlides:
+    name = "mock_slides"
+
+    def generate_many(self, jobs: dict, episode_id: int) -> dict:
+        out = {}
+        for k, (prompt, path) in jobs.items():
+            r = MockImages(source="gemini:mock", license="Generated").get(prompt, path, episode_id)
+            r.ai_generated = r.realistic = True
+            out[k] = r
+        return out
+
+    def get(self, prompt: str, out: Path, episode_id: int | None = None) -> ImageResult:
+        return self.generate_many({"x": (prompt, out)}, episode_id)["x"]
 
 
 class MockVideos:

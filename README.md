@@ -46,6 +46,7 @@ _system/                 資料庫、工作檔（續跑/重做用，通知後保
 | `SMTP_USER` / `SMTP_PASSWORD` | Gmail 帳號與 App Password |
 | `EMAIL_TO` | 收信信箱 |
 | `PIXABAY_API_KEY` | 建議：實景照片與 1080p 影片片段（Wikimedia 歷史圖像不需 key） |
+| `GEMINI_API_KEY` | 建議：投影片畫面（Nano Banana 2.1，Batch 半價；需在 AI Studio 綁定付款） |
 | `AZURE_SPEECH_KEY` | 選用：正式旁白（另設 Variable `VOICE_PROVIDER=azure`） |
 | `OPENAI_API_KEY` | 選用：AI 重建畫面（另設 Variable `IMAGE_PROVIDER=openai`） |
 
