@@ -57,13 +57,14 @@ REVIEW_SCHEMA = {
         "sounds_ai_generated": {"type": "boolean"},
         "unsupported_sentences": {"type": "array", "items": {"type": "string"}},
         "unexplained_terms": {"type": "array", "items": {"type": "string"}},
+        "boring_passages": {"type": "array", "items": {"type": "string"}},
         "issues": {"type": "array", "items": {"type": "string"}},
         "title_supported": {"type": "boolean"},
         "title_fix": {"type": "string"},
         "score": {"type": "number"},
     },
     "required": ["pass", "coherent", "follows_structure", "hook_strong", "natural_taiwanese_chinese",
-                 "sounds_ai_generated", "unsupported_sentences", "unexplained_terms", "issues", "title_supported", "title_fix", "score"],
+                 "sounds_ai_generated", "unsupported_sentences", "unexplained_terms", "boring_passages", "issues", "title_supported", "title_fix", "score"],
     "additionalProperties": False,
 }
 
@@ -79,6 +80,14 @@ SCRIPT_RULES = """寫作規則：
   · 全集只保留真正推動故事的專有名詞，地名與人名合計約 8–10 個；其他用描述代替（例如「河口北邊的老商業區」）。attractions 段落可以點名景點，但要說明它是什麼。
   · 講到殖民、戰爭、改朝換代時，先用一句話交代是誰、為什麼來，不預設觀眾知道。
   · 少用確切年份，能用「大約四百年前」「一百多年後」就不寫年份；需要年份時一段最多一個。
+- 講故事，不是講歷史課：
+  · 每段從一個具體場景開始（某些人、在某個地方、正在做某件事），不要從年份或概述開始。
+  · 每集挑 2–3 個關鍵人物或群體當「角色」，讓觀眾跟著他們的選擇與後果走。
+  · 適度用「你」把觀眾帶到現場（例如「如果你站在當年的碼頭上，會看到……」），加入聲音、氣味、畫面等細節；全集 3–5 次即可，不要每段都用。
+  · 每段至少一個讓人想說「真的假的？」的細節，而且必須來自已查核事實。
+  · 段落結尾可以用一句懸念或轉折接到下一段（例如「但他們沒想到，這個決定會在一百年後反咬自己一口。」），每段最多一句。
+  · 可以有輕輕帶過的幽默或口語吐槽，但不輕浮、不拿當地文化或族群開玩笑。
+  · 禁止課本寫法：不連續兩句都以年份開頭，不寫「……是……的重要……」「……具有重要意義」這類句子，不列年表。
 - 每一段都要回答「觀眾為什麼要在乎」，並用 causal_link 說明它如何承接上一段、推動下一段。
 - culture 不是獨立段落，要連回歷史、城市、商業。
 - attractions 必須是整個故事的結果：不要說「這裡很漂亮」，要說「理解了 X，你再看這個地方，就會發現它其實是……」。
@@ -164,16 +173,18 @@ def run(p, episode_id: int, feedback: str = "") -> None:
             "審查以下旁白稿：故事是否連貫？是否遵循 歷史→城市→商業→文化→景點 的因果鏈？hook 是否夠強？"
             "是否有未被已查核事實支持的主張（列出原句）？是否是自然的台灣繁體中文、不學術、不像 AI 寫的？有無不必要的重複？"
             "unexplained_terms：假設觀眾對這個地方一無所知，列出他們聽不懂、腳本卻沒有用白話解釋的地名、人名、事件或概念；專有名詞明顯太多時也列在這裡。"
+            "boring_passages：列出像在唸課本的段落開頭（從年份或概述開始、年表式列舉、「具有重要意義」這類句子、沒有場景與人物），並說明怎麼改成故事。"
             "腳本是否走製作人指定的敘事弧線、開頭 hook 是否做到要求？"
             "title_supported：標題的每個承諾（數字、情緒詞、因果）是否都被已查核事實與腳本兌現；若否，title_fix 寫一個符合同一原型、"
             "只承諾已兌現內容的修正版主標題（30 字以內，不含「｜世界先修課 EP.xx」），若是則留空字串。"
-            "score 0-10，>=7.5、無未支持主張且無 unexplained_terms 才 pass。\n\n"
+            "score 0-10，>=7.5、無未支持主張、無 unexplained_terms 且無 boring_passages 才 pass。\n\n"
             f"{brief_for(episode_id, 'review')}\n\n## 腳本\n{script_text(script)}",
             REVIEW_SCHEMA, episode_id, effort="medium",
             cached_prefix=f"## 已查核事實（審查依據）\n{fact_text}",
         )
         issues += (review["issues"] + [f"未支持的主張：{x}" for x in review["unsupported_sentences"]]
-                   + [f"觀眾聽不懂、需要白話解釋或刪掉：{x}" for x in review["unexplained_terms"]])
+                   + [f"觀眾聽不懂、需要白話解釋或刪掉：{x}" for x in review["unexplained_terms"]]
+                   + [f"像在唸課本，改成有場景與人物的故事：{x}" for x in review["boring_passages"]])
         if review["pass"] and not structural_issues(script, target, valid):
             break
         if round_ == 1:
