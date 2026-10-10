@@ -14,6 +14,10 @@ on:
       feedback:
         description: "修改意見（scenes 請寫場景編號，例如 s012 s015）"
         required: false
+      notify_now:
+        description: "做完立刻寄通知信（不等隔天早上）"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -90,6 +94,9 @@ jobs:
           TARGET: ${{ inputs.target }}
           FEEDBACK: ${{ inputs.feedback }}
         run: python -m worldprep.cli ci-regenerate "$EID" "$TARGET" --feedback "$FEEDBACK"
+      - name: Send email now
+        if: ${{ inputs.notify_now }}
+        run: python -m worldprep.cli ci-email
       - name: Push state to Google Drive
         if: always()
         run: python -m worldprep.cli ci-push
