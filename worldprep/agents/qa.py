@@ -77,9 +77,11 @@ def run(p, episode_id: int) -> bool:
     _check(r, "content", "facts_verified", len(valid_ids) >= 5, f"{len(valid_ids)} verified claims")
 
     # Visual
-    types = [sc["visual_type"] for sc in scenes if sc["visual_type"] != "slide"]  # 投影片本來就是主體，不算重複
+    types = [sc.get("shot_type") or sc["visual_type"] for sc in scenes]
     longest = max((len(list(g)) for _, g in groupby(types)), default=0)
-    _check(r, "visual", "visual_variety", longest <= 4, f"最長連續同類型 {longest}", critical=False)
+    landmark = types.count("landmark") / max(1, len(types))
+    _check(r, "visual", "visual_variety", longest <= 3 and landmark <= 0.35,
+           f"最長連續同類鏡頭 {longest}，地標風景占 {landmark:.0%}", critical=False)
     files = [a.file_path for a in assets if a.asset_type != "music"]
     dup = len(files) - len(set(files))
     _check(r, "visual", "no_duplicate_assets", dup == 0, f"{dup} duplicates", critical=False)

@@ -46,9 +46,9 @@ def _ai(p, sc: dict, out: Path, episode_id: int) -> ImageResult | None:
 
 
 SLIDE_STYLE = (
-    "Create one 16:9 frame for a cinematic travel documentary on a Taiwanese YouTube channel about why places became what they are. "
-    "The real local place is the hero: a recognizable landmark, old street, temple, riverside, mountain view or cityscape of the exact "
-    "place and period described, shot like high-end travel photography (or an authentic archival photo for historical periods). "
+    "Create one 16:9 frame for a cinematic documentary on a YouTube channel about why places became what they are. "
+    "The frame must clearly show what the narration is talking about, so a viewer could guess the sentence from the image alone. "
+    "Exact place and period must be correct; photorealistic, or an authentic archival-photo look for historical periods. "
     "Fill the entire frame edge to edge: no black bars, no letterboxing, no borders or frames. Natural light, rich detail, subtle deep navy (#0b1b3a) and warm gold (#d4a853) grading, consistent across the episode. "
     "No fake documents with writing, no English, no logos, no watermark. Real historical people: never show a recognizable face "
     "(use back view, silhouette, distance, or their objects). Maps: simple stylized silhouette with at most two place labels. "
@@ -67,8 +67,20 @@ def slide_text(sc: dict) -> str:
             "Keep text small so the place stays the focus. No other words.")
 
 
+SHOT_GUIDE = {
+    "people": "Shot type: people in action — a scene of the specific people and activity described, mid-shot, natural candid moment.",
+    "object": "Shot type: object close-up — the specific object described fills most of the frame, shallow depth of field, tactile detail.",
+    "map": "Shot type: stylized map — a clean, simple illustrated map with the route or area described, minimal labels.",
+    "then_now": "Shot type: then-and-now split — the same place in one frame, left half as it looked in the past, right half today, "
+                "with a soft vertical blend in the middle.",
+    "daily_life": "Shot type: daily life today — ordinary local people going about the activity described, street-level documentary photo.",
+    "landmark": "Shot type: landmark — the specific landmark or view described, high-end travel photography.",
+}
+
+
 def slide_prompt(sc: dict) -> str:
-    return (f"{SLIDE_STYLE}\n{slide_text(sc)}\n\nNarration (context only, do not write it on the image):\n{sc['script_text']}\n\n"
+    shot = SHOT_GUIDE.get(sc.get("shot_type", ""), "")
+    return (f"{SLIDE_STYLE}\n{shot}\n{slide_text(sc)}\n\nNarration (context only, do not write it on the image):\n{sc['script_text']}\n\n"
             f"What to show: {sc['visual_description']}")
 
 
@@ -86,10 +98,11 @@ SLIDE_CHECK_SCHEMA = {
                     "extra_or_garbled_text": {"type": "boolean"},
                     "recognizable_real_person_face": {"type": "boolean"},
                     "wrong_place_or_era": {"type": "boolean"},
+                    "shows_narration": {"type": "boolean"},
                     "note": {"type": "string"},
                 },
                 "required": ["index", "headline_correct", "number_correct", "extra_or_garbled_text",
-                             "recognizable_real_person_face", "wrong_place_or_era", "note"],
+                             "recognizable_real_person_face", "wrong_place_or_era", "shows_narration", "note"],
                 "additionalProperties": False,
             },
         }
@@ -135,12 +148,14 @@ def check_slides(p, scenes: dict[str, dict], slides: dict[str, ImageResult], epi
             "slide_check", "你是紀錄片的畫面審核員，只依圖片實際內容判斷。",
             "依序檢查以下投影片（index 從 0 開始）。headline_correct：圖上的地名標籤是否與指定文字逐字相同（指定沒有標籤時，圖上必須完全沒有字）；number_correct：數字是否逐字相同；"
             "extra_or_garbled_text：是否出現指定以外的文字或亂碼；recognizable_real_person_face：是否畫出可辨識的真實歷史人物臉孔；"
-            "wrong_place_or_era：畫面時代或地點是否明顯與旁白不符。\n\n" + listing,
+            "wrong_place_or_era：畫面時代或地點是否明顯與旁白不符。"
+            "shows_narration：畫面是否畫出旁白在講的具體東西或動作（只是一般風景、和旁白無關時填 false）。\n\n" + listing,
             images, SLIDE_CHECK_SCHEMA, episode_id,
         )
         for res in v["results"]:
             if 0 <= res["index"] < len(chunk) and (not res["headline_correct"] or not res["number_correct"] or res["extra_or_garbled_text"]
-                                                   or res["recognizable_real_person_face"] or res["wrong_place_or_era"]):
+                                                   or res["recognizable_real_person_face"] or res["wrong_place_or_era"]
+                                                   or not res["shows_narration"]):
                 bad.add(chunk[res["index"]])
                 log.info("slide_rejected", extra={"episode_id": episode_id, "scene": chunk[res["index"]], "note": res["note"][:200]})
     return bad

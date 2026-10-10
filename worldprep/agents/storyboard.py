@@ -5,6 +5,7 @@ from .prompts import EDITORIAL_DNA
 from .topic import brief_for
 
 VISUAL_TYPES = ["slide", "chart", "title_card"]
+SHOT_TYPES = ["people", "object", "map", "then_now", "daily_life", "landmark"]
 MOTIONS = ["zoom_in", "zoom_out", "pan_left", "pan_right", "static"]
 MAX_SCENE_CHARS = 45
 
@@ -19,6 +20,7 @@ SCENE_SCHEMA = {
                     "scene_id": {"type": "string"},
                     "visual_type": {"type": "string", "enum": VISUAL_TYPES},
                     "visual_description": {"type": "string"},
+                    "shot_type": {"type": "string", "enum": SHOT_TYPES},
                     "slide_headline": {"type": "string"},
                     "slide_number": {"type": "string"},
                     "search_query": {"type": "string"},
@@ -46,7 +48,7 @@ SCENE_SCHEMA = {
                         "additionalProperties": False,
                     },
                 },
-                "required": ["scene_id", "visual_type", "visual_description", "slide_headline", "slide_number", "search_query", "ai_prompt", "realistic",
+                "required": ["scene_id", "visual_type", "visual_description", "shot_type", "slide_headline", "slide_number", "search_query", "ai_prompt", "realistic",
                              "camera_motion", "transition", "on_screen_text", "map_required", "chart_required",
                              "map_place", "map_caption", "chart"],
                 "additionalProperties": False,
@@ -103,11 +105,16 @@ def run(p, episode_id: int) -> None:
         "visual_type：預設 slide；需要比較多個數字（人口、GDP、產業占比、成長）時用 chart（全集最多 6 個；數字只能取自下方已查核事實，"
         "values 必須與事實原文完全相同、不可換算，萬/億等單位寫在 unit，並填 claim_id 與 source）；title_card 不要使用。\n"
         "slide 的欄位：\n"
-        "- 畫面以「當地的景點與風景」為主角：每張都要讓觀眾看到這個地方本身（地標、老街、廟宇、河岸、山景、街景、市場等），"
-        "而不是只有事件或文字。講歷史事件時，畫出事件發生的那個地點（當年的樣子，或今天旅人能親眼看到的同一個地方，"
-        "例如講開港就畫淡水河口與紅毛城，講茶葉貿易就畫大稻埕老街）；講商業或數據時，畫出相關的城市地景。"
-        "全集至少七成的投影片要是今天旅人可以去看到的真實地點。\n"
-        "- 例外：geography 段落的第一個場景是定位地圖——觀眾對這個地方一無所知，畫一張簡化的區域地圖，標出這座城市的位置，"
+        "- 畫面必須畫出這句旁白裡的具體名詞或動作：沒聽到旁白的人，看畫面也要大概猜得到在講什麼。不要用和旁白無關的漂亮風景帶過。\n"
+        "- shot_type 依旁白內容選一種：\n"
+        "  · people：講到某些人在做某件事（工人、商人、船員、居民的動作與場面；真實歷史人物不畫臉）\n"
+        "  · object：講到具體的東西（貨物、工具、食物、交通工具、建築細節的特寫）\n"
+        "  · map：講到位置、航線、移動、範圍（簡化地圖＋路線或範圍）\n"
+        "  · then_now：講到「以前／現在」的對比（同一個地方，左半邊當年、右半邊今天）\n"
+        "  · daily_life：講到今天的人怎麼生活（市場、通勤、街頭小吃、節慶）\n"
+        "  · landmark：講到這個地方本身或景點（地標、建築、風景）\n"
+        "  多樣性規則：landmark 全集不超過三成（主要留給 attractions 段落）；同一種 shot_type 不可連續超過 2 個場景；每個段落至少用到 3 種。\n"
+        "- 例外：geography 段落的第一個場景固定是 map 定位地圖——觀眾對這個地方一無所知，畫一張簡化的區域地圖，標出這座城市的位置，"
         "slide_headline 填城市或國家名，最多再標一個鄰近的海或大區域名稱。\n"
         "- slide_headline：大多數投影片留空字串（純畫面、無字）。只在段落開頭、或需要點出地名時填寫，"
         "內容以地名或景點名為主（繁體中文 8 字內，例如「大稻埕」「淡水紅毛城」），全集有字的投影片不超過三成，且不可重複。\n"
@@ -124,7 +131,7 @@ def run(p, episode_id: int) -> None:
     by_id = {x["scene_id"]: x for x in data["scenes"]}
     for sc in scenes:
         v = by_id.get(sc["scene_id"]) or {"visual_type": "slide", "visual_description": sc["script_text"],
-                                         "slide_headline": sc["heading"], "slide_number": "", "search_query": "",
+                                         "shot_type": "landmark", "slide_headline": sc["heading"], "slide_number": "", "search_query": "",
                                          "ai_prompt": "", "realistic": True, "camera_motion": "static", "transition": "fade",
                                          "on_screen_text": "", "map_required": False, "chart_required": False,
                                          "map_place": "", "map_caption": "", "chart": {"title": "", "labels": [], "values": []}}

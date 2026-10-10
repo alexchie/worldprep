@@ -69,6 +69,7 @@ class MockLLM:
             for i, sid in enumerate(sids):
                 vt = cycle[i % len(cycle)]
                 out.append({"scene_id": sid, "visual_type": vt, "visual_description": f"東京畫面 {i}",
+                            "shot_type": ["people", "object", "map", "daily_life", "landmark"][i % 5],
                             "slide_headline": f"東京第{i + 1}幕", "slide_number": "",
                             "search_query": "Tokyo skyline", "ai_prompt": "", "realistic": False,
                             "camera_motion": ["zoom_in", "pan_left", "zoom_out", "pan_right"][i % 4], "transition": "fade",
