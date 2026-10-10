@@ -113,11 +113,11 @@ def run(p, episode_id: int) -> None:
             # Hook 與空白停頓之後：固定品牌圖＋品牌台詞，接著直接進正文
             brand_at = t
             brand_wav = st.path(episode_id, "audio", "brand.wav")
-            brand_len = media_duration(brand_wav) + 0.2
+            brand_len = media_duration(brand_wav) + cfg.brand_pause_seconds
             brand_clip = vdir / "brand.mp4"
             pending.append((image_clip, (BRAND_IMAGE, None, brand_len, "static", brand_clip, 0.2)))
             video_parts.append(brand_clip)
-            audio_parts += [brand_wav, silence(0.2, adir / "pad_brand.wav")]
+            audio_parts += [brand_wav, silence(cfg.brand_pause_seconds, adir / "pad_brand.wav")]
             t += brand_len
 
     with ThreadPoolExecutor(max_workers=RENDER_WORKERS) as pool:
