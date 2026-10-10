@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     claude_episode_budget_usd: float = 2.0
     gemini_episode_budget_usd: float = 2.0
     gemini_cover_reserve_usd: float = 0.6  # 留給中英文封面，投影片不可用掉這部分
+    gemini_cost_factor: float = 1.3  # 記帳時的保守係數（實際帳單比每張定價高）
     research_max_searches: int = 8
 
     schedule_produce: str = "18:00"

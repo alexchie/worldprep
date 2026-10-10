@@ -27,6 +27,8 @@ class GeminiSlides:
             raise PermanentError("GEMINI_API_KEY 未設定")
         self.client = genai.Client(api_key=s.gemini_api_key)
         self.model, self.price = s.slide_model, s.slide_price_usd
+        # Google 依 token 計費（含思考與參考圖），實際帳單約比每張定價多 25–30%：記帳時保守估計
+        self.factor = s.gemini_cost_factor
         self.batch, self.batch_wait = s.batch_enabled, s.slide_batch_wait_minutes * 60
 
     def _result(self, path: Path) -> ImageResult:
@@ -58,7 +60,7 @@ class GeminiSlides:
                     path = jobs[k][1].with_suffix(".jpg")
                     path.write_bytes(data if isinstance(data, bytes) else base64.b64decode(data))
                     out[k] = self._result(path)
-        costs.record(episode_id, "gemini", "slides_batch", len(out) * self.price * 0.5, images=len(out), model=self.model)
+        costs.record(episode_id, "gemini", "slides_batch", len(out) * self.price * 0.5 * self.factor, images=len(out), model=self.model)
         log.info("slide_batch_done", extra={"episode_id": episode_id, "state": job.state.name, "images": len(out), "requested": len(keys)})
         return out
 
@@ -70,7 +72,7 @@ class GeminiSlides:
         return get_settings().gemini_episode_budget_usd - costs.provider_total(episode_id, "gemini") - reserve
 
     def _guard(self, episode_id: int | None, price: float, reserve: float = 0.0) -> None:
-        if price > self.left(episode_id, reserve):
+        if price * self.factor > self.left(episode_id, reserve):
             raise costs.BudgetExceeded(f"本集 Gemini 已接近上限 {get_settings().gemini_episode_budget_usd} USD")
 
     def get(self, prompt: str, out: Path, episode_id: int | None = None, reserve: float = 0.0) -> ImageResult | None:
@@ -79,7 +81,7 @@ class GeminiSlides:
                                             response_format={"type": "image", "mime_type": "image/jpeg", **IMAGE_CONFIG})
         path = out.with_suffix(".jpg")
         path.write_bytes(base64.b64decode(r.output_image.data))
-        costs.record(episode_id, "gemini", "slide", self.price, model=self.model)
+        costs.record(episode_id, "gemini", "slide", self.price * self.factor, model=self.model)
         return self._result(path)
 
     @with_retry(attempts=3)
@@ -103,7 +105,7 @@ class GeminiSlides:
             raise RuntimeError("生圖沒有回傳圖片")
         path = out.with_suffix(".png")
         path.write_bytes(data if isinstance(data, bytes) else base64.b64decode(data))
-        costs.record(episode_id, "gemini", "compose", price, model=model)
+        costs.record(episode_id, "gemini", "compose", price * self.factor, model=model)
         return self._result(path)
 
     def generate_many(self, jobs: dict[str, tuple[str, Path]], episode_id: int) -> dict[str, ImageResult]:
@@ -112,7 +114,7 @@ class GeminiSlides:
             return {}
         done: dict[str, ImageResult] = {}
         reserve = get_settings().gemini_cover_reserve_usd
-        affordable = int(max(0.0, self.left(episode_id, reserve)) // (self.price * 0.5)) if episode_id is not None else len(jobs)
+        affordable = int(max(0.0, self.left(episode_id, reserve)) // (self.price * 0.5 * self.factor)) if episode_id is not None else len(jobs)
         if affordable < len(jobs):
             log.warning("slides_over_budget", extra={"episode_id": episode_id, "requested": len(jobs), "affordable": affordable})
             jobs = dict(list(jobs.items())[:affordable])
@@ -124,7 +126,7 @@ class GeminiSlides:
         for k, (prompt, out) in jobs.items():
             if k in done:
                 continue
-            if self.price > self.left(episode_id, reserve) or not costs.check_budget(episode_id, self.price):
+            if self.price * self.factor > self.left(episode_id, reserve) or not costs.check_budget(episode_id, self.price):
                 break
             try:
                 r = self.get(prompt, out, episode_id, reserve)
