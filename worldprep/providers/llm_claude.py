@@ -31,6 +31,7 @@ TASK_TIER = {
     "thumbnail": "sonnet",
     "qa_vision": "haiku",
     "cover_check": "sonnet",
+    "cover_check_strict": "opus",  # 英文封面第二道校對
     "slide_check": "haiku",
     "qa_vision_escalate": "opus",
 }

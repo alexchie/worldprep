@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     cover_model: str = "gemini-3-pro-image"  # 封面字多、要求逐字正確，用 Nano Banana Pro
     cover_price_usd: float = 0.134
     cover_attempts: int = 3
+    english_enabled: bool = True  # 英文版（Beyond Travel）；改成 False 即可暫停
     hook_min_seconds: float = 15.0
     hook_max_seconds: float = 23.0
     brand_pause_seconds: float = 0.75  # 品牌台詞前、後各留的空白（Hook → 空白 → 品牌 → 空白 → 正文）

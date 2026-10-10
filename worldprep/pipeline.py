@@ -23,6 +23,10 @@ STAGE_ATTEMPTS = 2
 def _deliver_all(p, eid):
     """中文版先交付；英文版接著做並交付到 Beyond Travel 資料夾。英文版失敗只寄通知，不擋中文版。"""
     drive.deliver(p, eid)
+    from .config import get_settings
+
+    if not get_settings().english_enabled:
+        return
     try:
         english.run(p, eid)
         drive.deliver_en(eid)

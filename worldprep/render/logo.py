@@ -96,3 +96,9 @@ def ensure_logo() -> Path:
     if not p.exists():
         generate_all()
     return p
+
+
+def mark(height: int) -> Image.Image:
+    """頻道 Logo 圖案（地球＋飛機，透明底，取自 Brand.png），依高度等比縮放。"""
+    img = Image.open(BRAND_DIR / "logo_mark.png").convert("RGBA")
+    return img.resize((round(img.width * height / img.height), height), Image.LANCZOS)

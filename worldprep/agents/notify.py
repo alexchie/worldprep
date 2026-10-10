@@ -97,7 +97,7 @@ def send_daily(p) -> list[int]:
         subject, body, text = episode_email(eid)
         p.email.send(cfg.email_to or "owner@localhost", subject, body, text,
                      {"thumb": st.path(eid, "thumbnails", "thumbnail.jpg")})
-        en = english_email(eid)  # 英文頻道 Beyond Travel 另寄一封
+        en = english_email(eid) if cfg.english_enabled else None  # 英文頻道 Beyond Travel 另寄一封
         if en:
             p.email.send(cfg.email_to or "owner@localhost", en[0], en[1], en[2], {"thumb": en[3]})
         with session() as s:

@@ -3,9 +3,9 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
-from ..brand import CHANNEL_NAME, GOLD, GRAY, NAVY, NAVY_DEEP, SKY, WHITE, ep_label, font_bold, font_regular
+from ..brand import GOLD, GRAY, NAVY, NAVY_DEEP, SKY, WHITE, ep_label, font_bold, font_regular
 from .. import edition
-from .logo import icon
+from .logo import mark
 
 W, H = 1920, 1080
 
@@ -140,9 +140,9 @@ def text_overlay(text: str, out: Path, watermark: bool = True) -> Path:
         for i, line in enumerate(lines):
             d.text((140, y0 + 30 + i * 72), line, font=f, fill=WHITE)
     if watermark:
-        wm = icon(96)
+        wm = mark(84)
         wm.putalpha(wm.getchannel("A").point(lambda a: int(a * 0.55)))
-        img.alpha_composite(wm, (W - 140, 44))
+        img.alpha_composite(wm, (W - wm.width - 44, 44))
     img.save(out)
     return out
 
@@ -170,7 +170,16 @@ def _fit_phrase(phrase: str, max_w: int) -> tuple[list[str], int, ImageFont.Free
     return lines, 60, _font(60)
 
 
-def thumbnail(background: Path | None, phrase: str, sub: str, episode_number: int, out: Path) -> Path:
+def _fit_lines(lines: list[str], max_w: int) -> tuple[list[str], int, ImageFont.FreeTypeFont]:
+    """已分好行的標題（例如英文依單字換行）：不再拆字，只調整字級讓最寬的一行放得下。"""
+    for size in range(120, 39, -4):
+        f = _font(size)
+        if max(f.getlength(x) for x in lines) <= max_w:
+            return lines, size, f
+    return lines, 40, _font(40)
+
+
+def thumbnail(background: Path | None, phrase: str | list[str], sub: str, episode_number: int, out: Path) -> Path:
     TW, TH = 1280, 720
     if background and background.exists():
         img = _cover(Image.open(background).convert("RGB"), (TW, TH))
@@ -184,7 +193,7 @@ def thumbnail(background: Path | None, phrase: str, sub: str, episode_number: in
     navy = Image.new("RGB", (TW, TH), NAVY_DEEP)
     img = Image.composite(navy, img, shade).convert("RGBA")
     d = ImageDraw.Draw(img)
-    lines, size, f = _fit_phrase(phrase, 760)
+    lines, size, f = _fit_lines(phrase, 760) if isinstance(phrase, list) else _fit_phrase(phrase, 760)
     y = TH / 2 - len(lines) * size * 0.62
     for line in lines:
         d.text((56 + 4, y + 4), line, font=f, fill=(0, 0, 0, 160))
@@ -194,11 +203,11 @@ def thumbnail(background: Path | None, phrase: str, sub: str, episode_number: in
         fs = _font(44)
         d.rectangle([56, y + 14, 56 + fs.getlength(sub) + 36, y + 14 + 68], fill=GOLD)
         d.text((74, y + 20), sub, font=fs, fill=NAVY_DEEP)
-    badge = f"{CHANNEL_NAME} | {ep_label(episode_number)}"
+    badge = f"{edition.current().channel} | {ep_label(episode_number)}"
     fb = _font(30)
     bw = fb.getlength(badge) + 84
     d.rounded_rectangle([TW - bw - 28, 26, TW - 28, 80], radius=10, fill=NAVY_DEEP + (230,), outline=GOLD, width=2)
-    img.alpha_composite(icon(40), (int(TW - bw - 18), 33))
+    img.alpha_composite(mark(40), (int(TW - bw - 18), 33))
     d.text((TW - bw + 34, 32), badge, font=fb, fill=WHITE)
     img.convert("RGB").save(out, quality=90)
     return out
