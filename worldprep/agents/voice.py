@@ -21,8 +21,8 @@ def run(p, episode_id: int) -> None:
         st.write_json(episode_id, "audio", name, timings)
     cfg = get_settings()
     if not st.exists(episode_id, "audio", "brand.wav"):
-        # 固定品牌台詞（開頭第 15 秒後），語速另外設定以盡量貼近 2 秒
-        p.voice.synthesize(cfg.brand_line, st.path(episode_id, "audio", "brand"), episode_id, rate=cfg.brand_rate)
+        # 固定品牌台詞（Hook 之後），與正文同語速
+        p.voice.synthesize(cfg.brand_line, st.path(episode_id, "audio", "brand"), episode_id)
     if p.voice.name != "mock":
         calibrate(timings)
 
