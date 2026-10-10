@@ -27,6 +27,7 @@ TASK_TIER = {
     "script_revise": "sonnet",
     "storyboard": "sonnet",
     "metadata": "haiku",
+    "social": "sonnet",  # 三種導流文案：Shorts、IG、Threads
     "thumbnail": "sonnet",
     "qa_vision": "haiku",
     "cover_check": "sonnet",

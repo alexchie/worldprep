@@ -37,6 +37,7 @@ def test_full_mock_episode_delivery_and_daily_email():
     mail = _outbox()[-1].read_text(encoding="utf-8")
     assert len(_outbox()) == before + 1
     assert title in mail and "YouTube 說明" in mail and "上傳檢查清單" in mail and "#世界先修課" in mail
+    assert "Instagram 貼文" in mail and "Threads 貼文" in mail and "YouTube Shorts 標題" in mail
     with session() as s:
         assert s.get(Episode, eid).status == "NOTIFIED"
 

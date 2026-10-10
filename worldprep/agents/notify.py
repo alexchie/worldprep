@@ -42,9 +42,15 @@ def episode_email(eid: int) -> tuple[str, str, str]:
         f"標籤：{tags}",
         "類別：旅遊與活動；觀眾：不是為兒童打造",
         "變造或合成內容：" + ("選「是」（本集含寫實的 AI 生成重建畫面）" if synthetic else "選「否」"),
-        f"短影音：正片發布後，上傳 short.mp4 當 Shorts，標題可用「{meta['main_title'][:90]} #Shorts」；"
+        "短影音：正片發布後，上傳 short.mp4 當 Shorts（標題與說明見下方宣傳文案）；"
         "在 Shorts 的「相關影片」選本集正片，觀眾才點得到完整影片；封面用手機 YouTube App 上傳時選「上傳縮圖」放 short_cover.jpg",
+        "宣傳：IG 用 thumbnail.jpg 發文、Threads 附上 short.mp4；文案中的【YouTube 正片連結】換成正片網址",
     ]
+    social = meta.get("social") or {}
+    promos = [("YouTube Shorts 標題", social.get("shorts_title", "")), ("YouTube Shorts 說明", social.get("shorts_description", "")),
+              ("Instagram 貼文（配 thumbnail.jpg）", social.get("instagram_caption", "")),
+              ("Threads 貼文（配 short.mp4）", social.get("threads_post", ""))]
+    promos = [(label, body) for label, body in promos if body]
     warn_html = ""
     if review or warnings:
         warn_html = ('<div style="background:#fff4e0;border-left:4px solid #d4a853;padding:10px 14px;margin-top:16px">'
@@ -63,6 +69,8 @@ def episode_email(eid: int) -> tuple[str, str, str]:
 {_section("YouTube 說明", meta["description"])}
 {_section("標籤", tags)}
 {_section("置頂留言（建議）", meta.get("pinned_comment", ""))}
+{'<h2 style="margin:28px 0 0;font-size:17px;border-top:2px solid #d4a853;padding-top:14px">宣傳文案（導流到 YouTube 正片）</h2>' if promos else ""}
+{"".join(_section(label, body) for label, body in promos)}
 <h3 style="margin:22px 0 6px;font-size:15px">上傳檢查清單</h3>
 <ol style="line-height:1.8;padding-left:20px">{"".join(f"<li>{html.escape(x)}</li>" for x in checklist)}</ol>
 {REQUEST_HINT_HTML}
@@ -71,7 +79,8 @@ def episode_email(eid: int) -> tuple[str, str, str]:
     text = (f"{CHANNEL_NAME} {ep_label(n)} 已完成\n\nDrive：{folder}\nQA：{qa}\n\n【YouTube 標題】\n{meta['title']}\n\n"
             + (f"【備選標題】\n{alternates}\n\n" if alternates else "")
             + f"【YouTube 說明】\n{meta['description']}\n\n【標籤】\n{tags}\n\n【置頂留言】\n{meta.get('pinned_comment', '')}\n\n"
-            "【上傳檢查清單】\n" + "\n".join(f"- {x}" for x in checklist)
+            + "".join(f"【{label}】\n{body}\n\n" for label, body in promos)
+            + "【上傳檢查清單】\n" + "\n".join(f"- {x}" for x in checklist)
             + f"\n\n{REQUEST_HINT}\n重做：GitHub Actions → regenerate，episode_id = {eid}")
     subject = f"{CHANNEL_NAME} {ep_label(n)} 已完成：{meta['main_title']}"
     return subject, body, text

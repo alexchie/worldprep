@@ -21,6 +21,39 @@ META_SCHEMA = {
 }
 
 
+SOCIAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "shorts_title": {"type": "string"},
+        "shorts_description": {"type": "string"},
+        "instagram_caption": {"type": "string"},
+        "threads_post": {"type": "string"},
+    },
+    "required": ["shorts_title", "shorts_description", "instagram_caption", "threads_post"],
+    "additionalProperties": False,
+}
+LINK = "【YouTube 正片連結】"
+
+
+def social_copy(p, episode_id: int, title: str, dest: str) -> dict:
+    """三種導流文案（YouTube Shorts、IG 封面貼文、Threads），目的都是把人帶到 YouTube 正片。"""
+    st = get_storage()
+    hook = " ".join(sc["text"] for sc in st.read_json(episode_id, "video", "timeline.json")["scenes"] if sc["section"] == "hook")
+    return p.llm.json(
+        "social", f"{EDITORIAL_DNA}\n\n你是頻道的社群小編，擅長寫讓人忍不住點進去看完整影片的短文案。",
+        f"正片標題：{title}\n目的地：{dest}\n短影音的開場旁白：{hook}\n\n"
+        "寫三種宣傳文案，目的都是導流到 YouTube 正片。只能用影片裡講到的事實，不誇大、不劇透答案，留下懸念。"
+        f"需要放正片網址的地方一律寫「{LINK}」，由頻道主發文時自己貼上。\n"
+        "- shorts_title：YouTube Shorts 標題，40 字內，結尾加 #Shorts。\n"
+        f"- shorts_description：Shorts 說明欄，2–3 句，引導看完整版，附上{LINK}與 3 個 hashtag（含 #世界先修課）。\n"
+        "- instagram_caption：IG 封面圖貼文。第一行就要抓住人；3–5 行短段落、可用少量 emoji；"
+        "IG 貼文的網址點不了，所以寫「完整影片連結在個人檔案」；結尾 5–8 個 hashtag（含 #世界先修課）。\n"
+        f"- threads_post：Threads 貼文（會搭配 Shorts 影片），300 字內、口語、像在跟朋友分享一個冷知識，"
+        f"最後一句引導去看完整影片並附上{LINK}；hashtag 最多 1 個。",
+        SOCIAL_SCHEMA, episode_id, effort="low",
+    )
+
+
 def chapters(timeline: dict) -> list[tuple[float, str]]:
     out = [(0.0, "開場")]
     for sc in timeline["scenes"]:
@@ -87,7 +120,7 @@ def run(p, episode_id: int, feedback: str = "", force: bool = False) -> dict:
         total += len(tag) + 2
     alternates = [t for t in titles[1:] if t != title and not validate_title(t, n)][:2]
     out = {"title": title, "main_title": TITLE_SUFFIX_RE.sub("", title).rstrip("｜| "), "title_alternates": alternates,
-           "description": description, "tags": tags,
+           "description": description, "tags": tags, "social": social_copy(p, episode_id, title, dest),
            "keywords": meta["keywords"], "hashtags": meta["hashtags"], "pinned_comment": meta["pinned_comment"],
            "chapters": [{"t": t, "label": h} for t, h in chs], "slogan": SLOGAN, "thesis": script["thesis"]}
     st.write_json(episode_id, "final", "metadata.json", out)

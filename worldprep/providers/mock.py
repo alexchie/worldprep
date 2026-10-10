@@ -89,6 +89,11 @@ class MockLLM:
                     "narrative_arc": "災難 → 重建 → 鐵道骨架 → 企業集中 → 今天的東京", "opening_15s": "先講關東大地震後的東京幾乎歸零",
                     "research_questions": ["德川幕府為何選江戶？"], "wow_details_to_verify": ["東京鐵塔 1958 年完工"],
                     "script_direction": "每段都回到重建", "visual_direction": "東京鐵塔、山手線"}
+        if task == "social":
+            return {"shorts_title": "東京被摧毀兩次，為什麼還是世界之都？ #Shorts",
+                    "shorts_description": "完整故事在這裡：【YouTube 正片連結】 #世界先修課 #東京 #城市",
+                    "instagram_caption": "東京其實被摧毀過兩次。\n完整影片連結在個人檔案\n#世界先修課 #東京",
+                    "threads_post": "你知道東京被毀過兩次嗎？完整版：【YouTube 正片連結】"}
         if task == "metadata":
             return {"description_intro": "東京為什麼能成為世界之都？這集從江戶幕府、明治維新、關東大地震一路看到今天的東京。",
                     "tags": ["東京", "Tokyo", "日本歷史", "城市發展", "世界先修課"], "keywords": ["東京"],
