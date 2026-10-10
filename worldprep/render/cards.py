@@ -200,3 +200,29 @@ def thumbnail(background: Path | None, phrase: str, sub: str, episode_number: in
     d.text((TW - bw + 34, 32), badge, font=fb, fill=WHITE)
     img.convert("RGB").save(out, quality=90)
     return out
+
+
+SHORTS_W, SHORTS_H = 1080, 1920
+SHORTS_LINES = ["詳細說明", "請點以下Youtube連結"]
+
+
+def shorts_endcard(cover: Path | None, out: Path, transparency: float = 0.7) -> Path:
+    """短影音結尾定格：封面鋪滿直式畫面並調成指定透明度（疊在品牌深藍上），中央放固定導流文字。"""
+    img = _gradient((SHORTS_W, SHORTS_H))
+    if cover and cover.exists():
+        # 直式裁切會把封面標題切成半截，模糊後只留色調與氛圍，不和導流文字打架
+        bg = _cover(Image.open(cover).convert("RGB"), (SHORTS_W, SHORTS_H)).filter(ImageFilter.GaussianBlur(28))
+        img = Image.blend(img, bg, 1 - transparency)
+    d = ImageDraw.Draw(img)
+    f = _font(96)
+    line_h = 140
+    top = SHORTS_H // 2 - line_h * len(SHORTS_LINES) // 2
+    for i, line in enumerate(SHORTS_LINES):
+        y = top + i * line_h
+        d.text(((SHORTS_W - f.getlength(line)) / 2, y), line, font=f, fill=WHITE, stroke_width=3, stroke_fill=NAVY_DEEP)
+    rule_y = top + line_h * len(SHORTS_LINES) + 40
+    d.line([(SHORTS_W / 2 - 160, top - 50), (SHORTS_W / 2 + 160, top - 50)], fill=GOLD, width=4)
+    cx = SHORTS_W / 2
+    d.polygon([(cx - 46, rule_y), (cx + 46, rule_y), (cx, rule_y + 56)], fill=GOLD)
+    img.save(out, quality=95)
+    return out

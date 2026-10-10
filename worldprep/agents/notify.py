@@ -42,6 +42,8 @@ def episode_email(eid: int) -> tuple[str, str, str]:
         f"標籤：{tags}",
         "類別：旅遊與活動；觀眾：不是為兒童打造",
         "變造或合成內容：" + ("選「是」（本集含寫實的 AI 生成重建畫面）" if synthetic else "選「否」"),
+        f"短影音：正片發布後，上傳 short.mp4 當 Shorts，標題可用「{meta['main_title'][:90]} #Shorts」；"
+        "在 Shorts 的「相關影片」選本集正片，觀眾才點得到完整影片",
     ]
     warn_html = ""
     if review or warnings:

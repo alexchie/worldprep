@@ -29,7 +29,7 @@ def test_full_mock_episode_delivery_and_daily_email():
         assert ep.drive_folder_url.startswith("file:")
         folder = get_settings().storage_root / "drive_mock" / "世界先修課" / f"EP.{ep.episode_number:02d}_東京"
         title = ep.title
-    for name in ("episode.mp4", "thumbnail.jpg", "zh-Hant.srt", "metadata.json", "qa_report.json"):
+    for name in ("episode.mp4", "short.mp4", "thumbnail.jpg", "zh-Hant.srt", "metadata.json", "qa_report.json"):
         assert any(folder.rglob(name)), name
 
     before = len(_outbox())

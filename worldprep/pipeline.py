@@ -7,7 +7,7 @@ from typing import Callable
 from sqlalchemy import select, update
 
 from . import drive
-from .agents import edit, factcheck, metadata, notify, qa, research, script, storyboard, thumbnail, visual, voice
+from .agents import edit, factcheck, metadata, notify, qa, research, script, shorts, storyboard, thumbnail, visual, voice
 from .agents.topic import full_titles, read_brief, retitle, select_topic
 from .db import audit, session, transition
 from .logging_setup import log
@@ -24,6 +24,7 @@ def _render_all(p, eid):
     # 封面先做：影片第一幀要承接封面主視覺
     thumbnail.run(p, eid)
     edit.run(p, eid)
+    shorts.run(p, eid)
     metadata.run(p, eid)
 
 
@@ -259,7 +260,7 @@ def regenerate(p: Providers, eid: int, target: str, feedback: str = "") -> None:
                 ep.title = full_titles(read_brief(eid), ep.episode_number)[0]
         thumbnail.run(p, eid, feedback, force=True)
         # 影片第一幀是封面，封面或標題換了就重新剪輯（場景片段會沿用）
-        for area, name in (("final", "episode.mp4"), ("final", "metadata.json"), ("video", "timeline.json")):
+        for area, name in (("final", "episode.mp4"), ("final", "short.mp4"), ("final", "metadata.json"), ("video", "timeline.json")):
             st.path(eid, area, name).unlink(missing_ok=True)
         restart, from_stage = S.VOICE_GENERATION, "render"
     else:
