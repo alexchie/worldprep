@@ -9,7 +9,8 @@ from ..retry import PermanentError, with_retry
 from .base import ImageResult
 
 DONE_STATES = {"JOB_STATE_SUCCEEDED", "JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"}
-IMAGE_CONFIG = {"aspect_ratio": "16:9", "image_size": "2K"}
+IMAGE_CONFIG = {"aspect_ratio": "16:9", "image_size": "1K"}  # 投影片用 1K（比 2K 便宜三分之一）
+COVER_IMAGE_CONFIG = {"aspect_ratio": "16:9", "image_size": "2K"}  # 封面字多，維持 2K（Nano Banana Pro 1K、2K 同價）
 MIN_BATCH = 10  # 少量重做直接即時生成，不值得排隊
 
 
@@ -94,7 +95,8 @@ class GeminiSlides:
                  for ref in references]
         r = self.client.models.generate_content(
             model=model, contents=[*parts, prompt],
-            config=types.GenerateContentConfig(response_modalities=["IMAGE"], image_config=types.ImageConfig(**IMAGE_CONFIG)),
+            config=types.GenerateContentConfig(response_modalities=["IMAGE"], image_config=types.ImageConfig(
+                **(COVER_IMAGE_CONFIG if model == s.cover_model else IMAGE_CONFIG))),
         )
         data = next((part.inline_data.data for c in r.candidates or [] for part in c.content.parts if part.inline_data), None)
         if not data:

@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     openai_image_model: str = "gpt-image-1"
     gemini_api_key: str = ""
     slide_model: str = "gemini-nano-banana-2.1"
-    slide_price_usd: float = 0.0504  # 2K，即時價；Batch 半價
+    slide_price_usd: float = 0.0336  # 1K，即時價；Batch 半價
     slide_batch_wait_minutes: int = 60
     cover_model: str = "gemini-3-pro-image"  # 封面字多、要求逐字正確，用 Nano Banana Pro
     cover_price_usd: float = 0.134
