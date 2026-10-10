@@ -226,3 +226,13 @@ def shorts_endcard(cover: Path | None, out: Path, transparency: float = 0.7) -> 
     d.polygon([(cx - 46, rule_y), (cx + 46, rule_y), (cx, rule_y + 56)], fill=GOLD)
     img.save(out, quality=95)
     return out
+
+
+def shorts_cover(cover: Path, out: Path) -> Path:
+    """Shorts 封面：與短影音第一個畫面相同——橫式封面置中，上下用同一張封面的模糊放大版填滿。"""
+    src = Image.open(cover).convert("RGB")
+    bg = ImageEnhance.Brightness(_cover(src, (SHORTS_W, SHORTS_H)).filter(ImageFilter.GaussianBlur(24))).enhance(0.88)
+    fg = src.resize((SHORTS_W, round(src.height * SHORTS_W / src.width)), Image.LANCZOS)
+    bg.paste(fg, (0, (SHORTS_H - fg.height) // 2))
+    bg.save(out, quality=92)
+    return out

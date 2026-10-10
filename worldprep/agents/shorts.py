@@ -51,6 +51,7 @@ def run(p, episode_id: int, force: bool = False) -> Path | None:
     if not final.exists() or not silent.exists() or end <= 0:
         log.warning("short_skipped", extra={"episode_id": episode_id, "brand_end": end})
         return None
+    cards.shorts_cover(st.path(episode_id, "thumbnails", "thumbnail.jpg"), st.path(episode_id, "thumbnails", "short_cover.jpg"))
     card = cards.shorts_endcard(st.path(episode_id, "thumbnails", "thumbnail.jpg"),
                                 st.path(episode_id, "thumbnails", "short_endcard.jpg"))
     ass = st.write_text(episode_id, "final", "short.ass", build_ass(timeline["scenes"], end))
