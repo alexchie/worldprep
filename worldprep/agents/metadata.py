@@ -1,3 +1,5 @@
+import re
+
 from sqlalchemy import select
 
 from ..brand import CHANNEL_DESCRIPTION, SLOGAN, TITLE_SUFFIX_RE, validate_title
@@ -52,6 +54,20 @@ def social_copy(p, episode_id: int, title: str, dest: str) -> dict:
         f"最後一句引導去看完整影片並附上{LINK}；hashtag 最多 1 個。",
         SOCIAL_SCHEMA, episode_id, effort="low",
     )
+
+
+MAX_HASHTAGS = 30  # YouTube：說明欄超過 60 個 hashtag 會全部被忽略；標題上方只顯示前 3 個
+
+
+def hashtag_line(hashtags: list[str], tags: list[str]) -> str:
+    """標籤併入說明欄：主要 hashtag 放最前面（會顯示在標題上方），其餘標籤接在後面，一律以 # 開頭、不含空格。"""
+    seen, out = set(), []
+    for t in [*hashtags, *tags]:
+        word = re.sub(r"[\s#＃,，。.、:：;；!！?？'\"()（）\-–—/｜|]+", "", t)
+        if word and word.lower() not in seen:
+            seen.add(word.lower())
+            out.append(f"#{word}")
+    return " ".join(out[:MAX_HASHTAGS])
 
 
 def chapters(timeline: dict) -> list[tuple[float, str]]:
@@ -110,7 +126,7 @@ def run(p, episode_id: int, feedback: str = "", force: bool = False) -> dict:
     if synthetic:
         parts.append("本片部分歷史場景為 AI 生成的示意重建畫面，並非真實影像。")
     parts.append(CHANNEL_DESCRIPTION)
-    parts.append(" ".join(h if h.startswith("#") else f"#{h}" for h in meta["hashtags"]))
+    parts.append(hashtag_line(meta["hashtags"], meta["tags"]))
     description = "\n\n".join(parts).replace("<", "＜").replace(">", "＞")[:4900]
     tags, total = [], 0
     for tag in meta["tags"]:

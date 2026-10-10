@@ -15,7 +15,7 @@ from ..models import Asset, Episode, ResearchSource
 from ..render import cards
 from ..storage import get_storage
 from . import edit, shorts, thumbnail, voice
-from .metadata import _fmt, chapters
+from .metadata import _fmt, chapters, hashtag_line
 from .script import hook_char_limit
 from .visual import check_slides, slide_prompt
 
@@ -189,7 +189,7 @@ def build_metadata(p, episode_id: int, title: str, titles: list[str], dest: str,
         parts.append("Credits\n" + "\n".join(f"- {a.creator} / {a.source} ({a.license})" for a in attributions))
     parts.append("Some historical scenes in this video are AI-generated illustrations, not real footage.")
     parts.append(CHANNEL_DESCRIPTION_EN)
-    parts.append(" ".join(h if h.startswith("#") else f"#{h}" for h in m["hashtags"]))
+    parts.append(hashtag_line(m["hashtags"], m["tags"]))
     tags, total = [], 0
     for tag in m["tags"]:
         if total + len(tag) + 2 > 480:
@@ -274,7 +274,7 @@ def email(eid: int) -> tuple[str, str, str, Path] | None:
     social = meta.get("social", {})
     box = "background:#f5f3ee;border:1px solid #e0dccf;border-radius:6px;padding:14px;white-space:pre-wrap;font-size:14px;line-height:1.6"
     sections = [("YouTube title", meta["title"]), ("Alternative titles", "\n".join(meta.get("title_alternates", []))),
-                ("YouTube description", meta["description"]), ("Tags", ", ".join(meta["tags"])),
+                ("YouTube description", meta["description"]),
                 ("Pinned comment (suggested)", meta.get("pinned_comment", "")),
                 ("YouTube Shorts title", social.get("shorts_title", "")), ("YouTube Shorts description", social.get("shorts_description", "")),
                 ("Instagram post (with thumbnail.jpg)", social.get("instagram_caption", "")),

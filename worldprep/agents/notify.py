@@ -33,14 +33,12 @@ def episode_email(eid: int) -> tuple[str, str, str]:
         warnings = [c for c in (ep.qa_report or {}).get("checks", []) if not c["pass"]]
         minutes = (ep.duration_seconds or 0) / 60
         requested = ep.requested_topic
-    tags = ", ".join(meta["tags"])
     alternates = "\n".join(meta.get("title_alternates", []))
     checklist = [
         "上傳 episode.mp4",
         "貼上標題與說明（下方）；也可改用備選標題",
         "縮圖：thumbnail.jpg（thumbnail_candidates 內有其他候選）",
         "字幕：上傳 zh-Hant.srt（影片已燒錄中文字幕，此檔供 YouTube CC 與搜尋使用）",
-        f"標籤：{tags}",
         "類別：旅遊與活動；觀眾：不是為兒童打造",
         "變造或合成內容：" + ("選「是」（本集含寫實的 AI 生成重建畫面）" if synthetic else "選「否」"),
         "短影音：正片發布後，上傳 short.mp4 當 Shorts（標題與說明見下方宣傳文案）；"
@@ -68,7 +66,6 @@ def episode_email(eid: int) -> tuple[str, str, str]:
 {_section("YouTube 標題", meta["title"])}
 {_section("備選標題", alternates) if alternates else ""}
 {_section("YouTube 說明", meta["description"])}
-{_section("標籤", tags)}
 {_section("置頂留言（建議）", meta.get("pinned_comment", ""))}
 {'<h2 style="margin:28px 0 0;font-size:17px;border-top:2px solid #d4a853;padding-top:14px">宣傳文案（導流到 YouTube 正片）</h2>' if promos else ""}
 {"".join(_section(label, body) for label, body in promos)}
@@ -79,7 +76,7 @@ def episode_email(eid: int) -> tuple[str, str, str]:
 </div></div>"""
     text = (f"{CHANNEL_NAME} {ep_label(n)} 已完成\n\nDrive：{folder}\nQA：{qa}\n\n【YouTube 標題】\n{meta['title']}\n\n"
             + (f"【備選標題】\n{alternates}\n\n" if alternates else "")
-            + f"【YouTube 說明】\n{meta['description']}\n\n【標籤】\n{tags}\n\n【置頂留言】\n{meta.get('pinned_comment', '')}\n\n"
+            + f"【YouTube 說明】\n{meta['description']}\n\n【置頂留言】\n{meta.get('pinned_comment', '')}\n\n"
             + "".join(f"【{label}】\n{body}\n\n" for label, body in promos)
             + "【上傳檢查清單】\n" + "\n".join(f"- {x}" for x in checklist)
             + f"\n\n{REQUEST_HINT}\n重做：GitHub Actions → regenerate，episode_id = {eid}")

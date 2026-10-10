@@ -40,6 +40,7 @@ def test_full_mock_episode_delivery_and_daily_email():
     mail = next(m for m in mails if "上傳檢查清單" in m)
     en_mail = next(m for m in mails if "Upload checklist" in m)
     assert title in mail and "YouTube 說明" in mail and "#世界先修課" in mail
+    assert "標籤" not in mail and "#Tokyo" in mail  # 標籤併入說明欄、以 # 開頭
     assert "Instagram 貼文" in mail and "Threads 貼文" in mail and "YouTube Shorts 標題" in mail
     assert "Beyond Travel EP." in en_mail and "Instagram post" in en_mail and "Threads post" in en_mail
     en_folder = get_settings().storage_root / "drive_mock" / "Beyond Travel" / f"EP.{ep_number:02d}_Tokyo"
