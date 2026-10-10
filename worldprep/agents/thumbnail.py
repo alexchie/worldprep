@@ -2,7 +2,8 @@ from pathlib import Path
 
 from PIL import Image
 
-from ..brand import CHANNEL_NAME, SLOGAN, ep_label
+from .. import edition
+from ..brand import ep_label
 from ..config import ROOT, get_settings
 from ..db import session
 from ..logging_setup import log
@@ -12,8 +13,6 @@ from ..storage import get_storage
 from .topic import read_brief
 
 COVER_DIR = ROOT / "cover_sample"
-BRAND_EN = "Beyond Travel"
-TAGS = ["歷史", "城市", "商業", "文化", "景點"]
 
 PLAN_SCHEMA = {
     "type": "object",
@@ -64,8 +63,12 @@ def cover_references() -> list[Path]:
 def plan_cover(p, episode_id: int, title: str, dest: str, n: int, feedback: str = "") -> dict:
     """依標題與企劃，填好封面規範第十一節的「本次任務輸入資料」。"""
     b = read_brief(episode_id) or {}
+    ed = edition.current()
+    lang_rule = ("" if ed.lang == "zh" else
+                 "\n\n這是英文頻道的封面：title_lines、gold_keywords、subtitle 一律寫英文（每行 2–5 個英文單字，subtitle 6 個單字內），"
+                 "其餘欄位照常。")
     return p.llm.json(
-        "thumbnail", f"你是《{CHANNEL_NAME}》的縮圖藝術總監。以下是頻道主的封面規範，請嚴格遵守。\n\n{cover_memory()}",
+        "thumbnail", f"你是《{ed.channel}》的縮圖藝術總監。以下是頻道主的封面規範，請嚴格遵守。\n\n{cover_memory()}",
         f"請為本集填寫封面的「本次任務輸入資料」。\n\n集數：{ep_label(n)}\nYouTube 完整影片標題：{title}\n目的地：{dest}\n"
         f"核心問題：{b.get('core_question', '')}\n畫面方向：{b.get('visual_direction', '')}\n\n"
         "欄位說明：\n"
@@ -76,12 +79,16 @@ def plan_cover(p, episode_id: int, title: str, dest: str, n: int, feedback: str 
         "- direction：本集主要方向。landmarks：2–4 個一定要出現、且真的位於該地的地標或視覺元素。\n"
         "- mood：希望呈現的情緒。scene：用英文描述一個具體的主視覺構圖（哪個地標、時間、光線、角度），"
         "要一眼看出是哪個城市，且呼應本集故事，不要只是把範本的地標換掉。"
-        + (f"\n\n頻道主回饋：{feedback}" if feedback else ""),
+        + lang_rule + (f"\n\n頻道主回饋：{feedback}" if feedback else ""),
         PLAN_SCHEMA, episode_id,
     )
 
 
 def cover_prompt(plan: dict, n: int) -> str:
+    ed = edition.current()
+    brand = "」「".join(ed.brand_lines)
+    lang_rule = ("" if ed.lang == "zh" else
+                 "這是英文頻道版本：畫面上所有文字都是英文，不可出現任何中文字；參考圖裡的中文品牌與標籤一律換成上述英文。")
     title = "\n".join(plan["title_lines"])
     gold = "、".join(plan["gold_keywords"]) or "（無）"
     return (
@@ -92,23 +99,24 @@ def cover_prompt(plan: dict, n: int) -> str:
         f"【副標題】：{plan['subtitle'] or '無'}\n【影片核心問題】：{plan['core_question']}\n【本集主要方向】：{plan['direction']}\n"
         f"【必須出現的地標或視覺元素】：{'、'.join(plan['landmarks'])}\n【希望呈現的情緒】：{plan['mood']}\n"
         f"【主視覺構圖】：{plan['scene']}\n"
-        f"【其他限制】：左上角品牌固定為「{CHANNEL_NAME}」「{BRAND_EN}」「{SLOGAN}」"
-        f"（參考圖裡的舊英文品牌 WORLD WISE 已停用，一律寫「{BRAND_EN}」）；底部五個標籤固定為「{'｜'.join(TAGS)}」；"
+        f"【其他限制】：左上角品牌固定為「{brand}」（參考圖裡的舊英文品牌 WORLD WISE 已停用）；底部五個標籤固定為「{' | '.join(ed.tags)}」；"
         "除上述文字與主標題、副標題外不得有任何其他文字。附上的參考圖是系列設計規範，只輸出一張全新的單集縮圖。"
+        + lang_rule
     )
 
 
 def check_cover(p, image: Path, plan: dict, n: int, episode_id: int) -> dict:
     if not hasattr(p.llm, "vision_json"):
         return {"ok": True, "note": ""}
+    ed = edition.current()
 
     v = p.llm.vision_json(
         "cover_check", "你是封面校對員，逐字核對圖片上實際出現的文字，不要猜測。",
         f"指定主標題（逐字）：{''.join(plan['title_lines'])}\n副標題：{plan['subtitle'] or '無'}\n"
-        f"品牌：{CHANNEL_NAME}／{BRAND_EN}／{SLOGAN}\n集數：{ep_label(n)}\n底部標籤：{'、'.join(TAGS)}\n"
+        f"品牌：{'／'.join(ed.brand_lines)}\n集數：{ep_label(n)}\n底部標籤：{'、'.join(ed.tags)}\n"
         f"應出現的地標：{'、'.join(plan['landmarks'])}（位於 {plan['city']}）\n\n"
         "single_thumbnail：是否只有一張完整縮圖（不是九宮格或拼貼）。title_exact：主標題是否逐字正確（換行不影響）。"
-        "brand_exact／episode_exact／tags_exact：各自是否逐字正確。no_extra_or_garbled_text：是否沒有其他多餘文字、亂碼或簡體字。"
+        "brand_exact／episode_exact／tags_exact：各自是否逐字正確。no_extra_or_garbled_text：是否沒有其他多餘文字、亂碼或簡體字（英文版封面則不可出現任何中文字）。"
         "landmarks_correct：地標是否正確、沒有錯誤拼接。note 寫出發現的問題。",
         [image], CHECK_SCHEMA, episode_id,
     )
@@ -138,14 +146,14 @@ def _fallback(p, episode_id: int, plan: dict, n: int, final: Path) -> Path:
     return _finalize(out, final)
 
 
-def run(p, episode_id: int, feedback: str = "", force: bool = False) -> Path:
+def run(p, episode_id: int, feedback: str = "", force: bool = False, title: str | None = None) -> Path:
     st = get_storage()
     final = st.path(episode_id, "thumbnails", "thumbnail.jpg")
     if final.exists() and not force:
         return final
     with session() as s:
         ep = s.get(Episode, episode_id)
-        n, dest, title = ep.episode_number, ep.destination, ep.title
+        n, dest, title = ep.episode_number, ep.destination, title or ep.title
     plan = plan_cover(p, episode_id, title, dest, n, feedback)
     attempts = []
     if p.slides and hasattr(p.slides, "compose"):

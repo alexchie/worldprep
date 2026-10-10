@@ -1,4 +1,5 @@
 import asyncio
+import re
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -12,7 +13,8 @@ from .base import VoiceResult
 
 _EDGE = "silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.03"
 TRIM_SILENCE = f"{_EDGE},areverse,{_EDGE},areverse"
-MAX_CHARS_PER_SECOND = 9  # 正常旁白約每秒 4–5 字
+MAX_CHARS_PER_SECOND = 9  # 正常中文旁白約每秒 4–5 字
+MAX_WORDS_PER_SECOND = 5  # 正常英文旁白約每秒 2.5 個單字
 
 
 class AzureVoice:
@@ -54,8 +56,8 @@ class EdgeVoice:
 
     name = "edge"
 
-    def __init__(self):
-        self.voice = get_settings().voice_name
+    def __init__(self, voice: str | None = None):
+        self.voice = voice or get_settings().voice_name
 
     @with_retry()
     def synthesize(self, text: str, out: Path, episode_id: int | None = None, rate: str = "-3%") -> VoiceResult:
@@ -69,7 +71,8 @@ class EdgeVoice:
         mp3.unlink(missing_ok=True)
         duration = media_duration(wav)
         # 偶爾會回傳被截斷的音檔（沒有報錯），依字數檢查長度，太短就重試
-        if duration < len(text) / MAX_CHARS_PER_SECOND:
+        cjk = re.search(r"[一-鿿]", text)
+        if duration < (len(text) / MAX_CHARS_PER_SECOND if cjk else len(text.split()) / MAX_WORDS_PER_SECOND):
             raise RuntimeError(f"Edge TTS 音檔過短：{duration:.1f}s / {len(text)} 字")
         costs.record(episode_id, "edge", "tts", 0.0, chars=len(text))
         return VoiceResult(wav, duration, len(text))

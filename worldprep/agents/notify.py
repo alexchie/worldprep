@@ -11,6 +11,7 @@ from ..logging_setup import log
 from ..models import AuditLog, Episode
 from ..states import State
 from ..storage import get_storage
+from .english import email as english_email
 
 REQUEST_HINT = "想指定下一集主題？直接回覆這封信，寫下目的地或想看的角度（例如「京都：為什麼能活過千年」）。凌晨 2:00 前回覆，隔天 08:00 收到成品；沒有回覆的那天不製作。可一次回覆多封，系統每天做一集、依序製作。"
 REQUEST_HINT_HTML = (f'<div style="background:#0b1b3a;color:#fff;border-radius:6px;padding:12px 16px;margin-top:20px">'
@@ -96,6 +97,9 @@ def send_daily(p) -> list[int]:
         subject, body, text = episode_email(eid)
         p.email.send(cfg.email_to or "owner@localhost", subject, body, text,
                      {"thumb": st.path(eid, "thumbnails", "thumbnail.jpg")})
+        en = english_email(eid)  # 英文頻道 Beyond Travel 另寄一封
+        if en:
+            p.email.send(cfg.email_to or "owner@localhost", en[0], en[1], en[2], {"thumb": en[3]})
         with session() as s:
             ep = s.get(Episode, eid)
             transition(s, ep, State.NOTIFIED, "daily email sent")

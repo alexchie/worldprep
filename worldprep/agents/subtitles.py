@@ -4,7 +4,25 @@ import re
 MAX_LINE = 18
 
 
+def _english_phrases(text: str, max_len: int) -> list[str]:
+    """英文依標點與單字斷行，不切斷單字。"""
+    out = []
+    for part in re.split(r"(?<=[.!?;:])\s+", text.strip()):
+        line = ""
+        for word in part.split():
+            if line and len(line) + 1 + len(word) > max_len:
+                out.append(line)
+                line = word
+            else:
+                line = f"{line} {word}".strip()
+        if line:
+            out.append(line)
+    return out
+
+
 def phrases(text: str, max_len: int = MAX_LINE) -> list[str]:
+    if not re.search(r"[一-鿿]", text):
+        return _english_phrases(text, max_len)
     parts = [x for x in re.split(r"(?<=[，。！？；：、,!?;:])", text) if x.strip()]
     out = []
     for part in parts:
@@ -44,5 +62,5 @@ def cues(timeline: list[dict], max_len: int = MAX_LINE) -> list[tuple[float, flo
     return out
 
 
-def build_srt(timeline: list[dict]) -> str:
-    return "\n".join(f"{i}\n{_ts(a)} --> {_ts(b)}\n{text}\n" for i, (a, b, text) in enumerate(cues(timeline), 1))
+def build_srt(timeline: list[dict], max_len: int = MAX_LINE) -> str:
+    return "\n".join(f"{i}\n{_ts(a)} --> {_ts(b)}\n{text}\n" for i, (a, b, text) in enumerate(cues(timeline, max_len), 1))

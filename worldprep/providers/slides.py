@@ -71,23 +71,25 @@ class GeminiSlides:
         return self._result(path)
 
     @with_retry(attempts=3)
-    def compose(self, prompt: str, references: list[Path], out: Path, episode_id: int | None = None) -> ImageResult:
-        """帶參考圖生成單張圖（封面用較強的模型）：參考圖當作系列設計規範。"""
+    def compose(self, prompt: str, references: list[Path], out: Path, episode_id: int | None = None,
+                model: str | None = None, price: float | None = None) -> ImageResult:
+        """帶參考圖生成單張圖：封面用較強的模型、參考圖當系列設計規範；也用來把投影片上的中文字換成英文。"""
         from google.genai import types
 
         s = get_settings()
+        model, price = model or s.cover_model, s.cover_price_usd if price is None else price
         parts = [types.Part.from_bytes(data=ref.read_bytes(), mime_type="image/png" if ref.suffix.lower() == ".png" else "image/jpeg")
                  for ref in references]
         r = self.client.models.generate_content(
-            model=s.cover_model, contents=[*parts, prompt],
+            model=model, contents=[*parts, prompt],
             config=types.GenerateContentConfig(response_modalities=["IMAGE"], image_config=types.ImageConfig(**IMAGE_CONFIG)),
         )
         data = next((part.inline_data.data for c in r.candidates or [] for part in c.content.parts if part.inline_data), None)
         if not data:
-            raise RuntimeError("封面生成沒有回傳圖片")
+            raise RuntimeError("生圖沒有回傳圖片")
         path = out.with_suffix(".png")
         path.write_bytes(data if isinstance(data, bytes) else base64.b64decode(data))
-        costs.record(episode_id, "gemini", "cover", s.cover_price_usd, model=s.cover_model)
+        costs.record(episode_id, "gemini", "compose", price, model=model)
         return self._result(path)
 
     def generate_many(self, jobs: dict[str, tuple[str, Path]], episode_id: int) -> dict[str, ImageResult]:

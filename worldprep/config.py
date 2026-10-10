@@ -47,7 +47,6 @@ class Settings(BaseSettings):
     hook_min_seconds: float = 15.0
     hook_max_seconds: float = 23.0
     brand_pause_seconds: float = 0.75  # 品牌台詞前、後各留的空白（Hook → 空白 → 品牌 → 空白 → 正文）
-    brand_line: str = "世界先修課，跟著我們一起看懂世界再出發"  # 與正文同語速、長度不設限
 
     music_dir: Path = ROOT / "music"
 

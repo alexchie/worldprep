@@ -7,7 +7,7 @@ from typing import Callable
 from sqlalchemy import select, update
 
 from . import drive
-from .agents import edit, factcheck, metadata, notify, qa, research, script, shorts, storyboard, thumbnail, visual, voice
+from .agents import edit, english, factcheck, metadata, notify, qa, research, script, shorts, storyboard, thumbnail, visual, voice
 from .agents.topic import full_titles, read_brief, retitle, select_topic
 from .db import audit, session, transition
 from .logging_setup import log
@@ -18,6 +18,17 @@ from .states import State as S
 from .storage import get_storage
 
 STAGE_ATTEMPTS = 2
+
+
+def _deliver_all(p, eid):
+    """中文版先交付；英文版接著做並交付到 Beyond Travel 資料夾。英文版失敗只寄通知，不擋中文版。"""
+    drive.deliver(p, eid)
+    try:
+        english.run(p, eid)
+        drive.deliver_en(eid)
+    except Exception as e:
+        log.error("english_failed", extra={"episode_id": eid, "err": str(e)[:500]})
+        notify_failure(p, eid, "english", e)
 
 
 def _render_all(p, eid):
@@ -46,7 +57,7 @@ STAGES = [
     Stage("voice", S.ASSET_GENERATION, S.VOICE_GENERATION, None, voice.run),
     Stage("render", S.VOICE_GENERATION, S.RENDERING, None, _render_all),
     Stage("qa", S.RENDERING, S.QA, S.READY_FOR_DELIVERY, qa.run),
-    Stage("deliver", S.READY_FOR_DELIVERY, None, S.DELIVERED, drive.deliver),
+    Stage("deliver", S.READY_FOR_DELIVERY, None, S.DELIVERED, _deliver_all),
 ]
 
 
@@ -266,6 +277,10 @@ def regenerate(p: Providers, eid: int, target: str, feedback: str = "") -> None:
     else:
         for area in ("video", "final", "thumbnails", "subtitles"):
             st.clear(eid, area)
+        # 內容變了，英文版要跟著重做（交付時自動重跑）
+        import shutil
+
+        shutil.rmtree(english.en_root(eid), ignore_errors=True)
         if target == "scenes":
             import re
 

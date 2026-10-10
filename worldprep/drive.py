@@ -257,6 +257,41 @@ def deliver(p, eid: int) -> None:
     log.info("drive_delivered", extra={"episode_id": eid, "folder": folder_name})
 
 
+def deliver_en(eid: int) -> str:
+    """英文版交付到 <指定資料夾>/Beyond Travel/EP.xx_Place/，資料夾網址寫在英文版的 final/delivery.txt。"""
+    import json
+
+    from .agents.english import DELIVERABLES as EN_FILES, en_root
+    from .db import audit, session
+    from .models import Episode
+
+    root = en_root(eid) / f"ep{eid:04d}"
+    meta = json.loads((root / "final" / "metadata.json").read_text(encoding="utf-8"))
+    with session() as s:
+        n = s.get(Episode, eid).episode_number
+    folder_name = f"{ep_label(n)}_{meta.get('destination') or 'episode'}"
+    files = [root / area / name for area, name in EN_FILES if (root / area / name).exists()]
+    if get_settings().mock:
+        import shutil
+
+        target = get_settings().storage_root / "drive_mock" / "Beyond Travel" / folder_name
+        target.mkdir(parents=True, exist_ok=True)
+        for f in files:
+            shutil.copy(f, target / f.name)
+        url = target.resolve().as_uri()
+    else:
+        d = Drive()
+        target = d.folder("Beyond Travel", folder_name)
+        for f in files:
+            d.upload(f, target)
+        url = f"https://drive.google.com/drive/folders/{target}"
+    (root / "final" / "delivery.txt").write_text(url, encoding="utf-8")
+    with session() as s:
+        audit(s, "delivered_en", eid, folder=folder_name)
+    log.info("drive_delivered_en", extra={"episode_id": eid, "folder": folder_name})
+    return url
+
+
 def upload_music(path: Path) -> None:
     """授權配樂放 Drive，不放公開 repo。"""
     d = Drive()

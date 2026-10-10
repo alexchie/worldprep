@@ -7,7 +7,8 @@ from pathlib import Path
 
 from sqlalchemy import delete
 
-from ..config import ROOT, get_settings
+from .. import edition
+from ..config import get_settings
 from ..db import session
 from ..logging_setup import log
 from ..models import Asset, Episode
@@ -19,8 +20,8 @@ GAP = 0.35
 SECTION_GAP = 0.9
 BURN_SUBTITLES = True
 RENDER_WORKERS = max(1, (os.cpu_count() or 2) // 2)
-BRAND_IMAGE = ROOT / "opening" / "Brand.png"
 MAX_HOOK_SPEEDUP = 1.25
+SRT_NAME = {"zh": "zh-Hant.srt", "en": "en.srt"}
 
 
 def pick_music(episode_id: int, seconds: float) -> dict | None:
@@ -60,7 +61,7 @@ def opening_table(timeline: list[dict], brand_at: float | None, brand_len: float
         rows.append(f"| {sc['start']:05.2f}–{sc['start'] + sc['duration']:05.2f} | "
                     f"{'封面主視覺' if sc is timeline[0] else sc['scene_id']} | {sc['text']} |")
     if brand_at is not None:
-        rows.append(f"| {brand_at:05.2f}–{brand_at + brand_len:05.2f} | 品牌圖 Brand.png | {brand_line} |")
+        rows.append(f"| {brand_at:05.2f}–{brand_at + brand_len:05.2f} | 品牌圖 {edition.current().brand_image.name} | {brand_line} |")
         rows.append(f"| {brand_at + brand_len:05.2f} 起 | 正文 | {next((s['text'] for s in timeline if s['section'] != 'hook'), '')} |")
     return "# 開場製作表\n\n" + "\n".join(rows) + "\n"
 
@@ -78,6 +79,7 @@ def run(p, episode_id: int) -> None:
     adir = st.path(episode_id, "audio", "x").parent
 
     cfg = get_settings()
+    ed = edition.current()
     cover = st.path(episode_id, "thumbnails", "thumbnail.jpg")
     hook_ids = [sc["scene_id"] for sc in scenes if sc["section"] == "hook"]
     hook_audio = fit_hook(timings, hook_ids, adir, cfg.hook_max_seconds)
@@ -115,7 +117,7 @@ def run(p, episode_id: int) -> None:
             brand_wav = st.path(episode_id, "audio", "brand.wav")
             brand_len = media_duration(brand_wav) + cfg.brand_pause_seconds
             brand_clip = vdir / "brand.mp4"
-            pending.append((image_clip, (BRAND_IMAGE, None, brand_len, "static", brand_clip, 0.2)))
+            pending.append((image_clip, (ed.brand_image, None, brand_len, "static", brand_clip, 0.2)))
             video_parts.append(brand_clip)
             audio_parts += [brand_wav, silence(cfg.brand_pause_seconds, adir / "pad_brand.wav")]
             t += brand_len
@@ -125,12 +127,12 @@ def run(p, episode_id: int) -> None:
 
     silent_video = concat(video_parts, vdir / "video_silent.mp4")
     narration = concat(audio_parts, adir / "narration.wav")
-    srt = st.write_text(episode_id, "subtitles", "zh-Hant.srt", build_srt(timeline))
+    srt = st.write_text(episode_id, "subtitles", SRT_NAME[ed.lang], build_srt(timeline, ed.sub_max))
     st.write_json(episode_id, "video", "timeline.json",
                   {"hook_end": brand_at or 0.0, "brand_end": (brand_at or 0.0) + (brand_len if brand_at is not None else 0.0),
                    "total": t, "scenes": timeline})
     st.write_text(episode_id, "scripts", "opening.md", opening_table(timeline, brand_at, brand_len if brand_at is not None else 0.0,
-                                                                      cfg.brand_line))
+                                                                      ed.brand_line))
 
     music = pick_music(episode_id, t)
     inputs = ["-i", str(silent_video), "-i", str(narration)]
@@ -150,6 +152,9 @@ def run(p, episode_id: int) -> None:
                 "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", "-r", "30",
                 "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", "-shortest", tmp.name], cwd=vdir)
     shutil.move(tmp, final)
+    if ed.lang != "zh":  # 英文版不改動資料庫裡的集數資料（片長、配樂紀錄以中文版為準）
+        log.info("render_done", extra={"episode_id": episode_id, "lang": ed.lang, "video_seconds": round(t, 1)})
+        return
 
     with session() as s:
         s.execute(delete(Asset).where(Asset.episode_id == episode_id, Asset.asset_type == "music"))

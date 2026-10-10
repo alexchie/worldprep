@@ -28,22 +28,29 @@ def test_full_mock_episode_delivery_and_daily_email():
         assert not any("旅遊攻略" in t for t in meta["title_alternates"])
         assert ep.drive_folder_url.startswith("file:")
         folder = get_settings().storage_root / "drive_mock" / "世界先修課" / f"EP.{ep.episode_number:02d}_東京"
-        title = ep.title
+        title, ep_number = ep.title, ep.episode_number
     for name in ("episode.mp4", "short.mp4", "short_cover.jpg", "thumbnail.jpg", "zh-Hant.srt", "metadata.json", "qa_report.json"):
         assert any(folder.rglob(name)), name
 
     before = len(_outbox())
     assert send_daily_email(p) == [eid]
-    mail = _outbox()[-1].read_text(encoding="utf-8")
-    assert len(_outbox()) == before + 1
-    assert title in mail and "YouTube 說明" in mail and "上傳檢查清單" in mail and "#世界先修課" in mail
+    # 中文版與英文版（Beyond Travel）各一封
+    assert len(_outbox()) == before + 2
+    mails = [f.read_text(encoding="utf-8") for f in _outbox()[before:]]
+    mail = next(m for m in mails if "上傳檢查清單" in m)
+    en_mail = next(m for m in mails if "Upload checklist" in m)
+    assert title in mail and "YouTube 說明" in mail and "#世界先修課" in mail
     assert "Instagram 貼文" in mail and "Threads 貼文" in mail and "YouTube Shorts 標題" in mail
+    assert "Beyond Travel EP." in en_mail and "Instagram post" in en_mail and "Threads post" in en_mail
+    en_folder = get_settings().storage_root / "drive_mock" / "Beyond Travel" / f"EP.{ep_number:02d}_Tokyo"
+    for name in ("episode.mp4", "short.mp4", "short_cover.jpg", "thumbnail.jpg", "en.srt", "metadata.json"):
+        assert any(en_folder.rglob(name)), name
     with session() as s:
         assert s.get(Episode, eid).status == "NOTIFIED"
 
     # 同一天排程再觸發：已寄過信，不再寄「今日沒有新影片」
     assert send_daily_email(p) == []
-    assert len(_outbox()) == before + 1
+    assert len(_outbox()) == before + 2
 
     regenerate(p, eid, "title", "更有懸念")
     advance(p, eid)

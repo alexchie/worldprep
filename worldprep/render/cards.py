@@ -4,6 +4,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 from ..brand import CHANNEL_NAME, GOLD, GRAY, NAVY, NAVY_DEEP, SKY, WHITE, ep_label, font_bold, font_regular
+from .. import edition
 from .logo import icon
 
 W, H = 1920, 1080
@@ -116,7 +117,8 @@ def chart(data: dict, out: Path) -> Path:
     if data.get("unit"):
         ax.set_ylabel(data["unit"], color=hexc(SKY), fontproperties=fp, fontsize=24)
     if data.get("source"):
-        fig.text(0.06, 0.03, f"資料來源：{data['source']}", color=hexc(GRAY), fontproperties=fp, fontsize=18)
+        label = "Source: " if edition.current().lang == "en" else "資料來源："
+        fig.text(0.06, 0.03, f"{label}{data['source']}", color=hexc(GRAY), fontproperties=fp, fontsize=18)
     fig.subplots_adjust(left=0.08, right=0.95, top=0.82, bottom=0.12)
     fig.savefig(out, facecolor=fig.get_facecolor())
     plt.close(fig)
@@ -203,10 +205,9 @@ def thumbnail(background: Path | None, phrase: str, sub: str, episode_number: in
 
 
 SHORTS_W, SHORTS_H = 1080, 1920
-SHORTS_LINES = ["詳細說明", "請點以下Youtube連結"]
 
 
-def shorts_endcard(cover: Path | None, out: Path, transparency: float = 0.7) -> Path:
+def shorts_endcard(cover: Path | None, out: Path, lines: tuple[str, ...], transparency: float = 0.7) -> Path:
     """短影音結尾定格：封面鋪滿直式畫面並調成指定透明度（疊在品牌深藍上），中央放固定導流文字。"""
     img = _gradient((SHORTS_W, SHORTS_H))
     if cover and cover.exists():
@@ -216,11 +217,11 @@ def shorts_endcard(cover: Path | None, out: Path, transparency: float = 0.7) -> 
     d = ImageDraw.Draw(img)
     f = _font(96)
     line_h = 140
-    top = SHORTS_H // 2 - line_h * len(SHORTS_LINES) // 2
-    for i, line in enumerate(SHORTS_LINES):
+    top = SHORTS_H // 2 - line_h * len(lines) // 2
+    for i, line in enumerate(lines):
         y = top + i * line_h
         d.text(((SHORTS_W - f.getlength(line)) / 2, y), line, font=f, fill=WHITE, stroke_width=3, stroke_fill=NAVY_DEEP)
-    rule_y = top + line_h * len(SHORTS_LINES) + 40
+    rule_y = top + line_h * len(lines) + 40
     d.line([(SHORTS_W / 2 - 160, top - 50), (SHORTS_W / 2 + 160, top - 50)], fill=GOLD, width=4)
     cx = SHORTS_W / 2
     d.polygon([(cx - 46, rule_y), (cx + 46, rule_y), (cx, rule_y + 56)], fill=GOLD)

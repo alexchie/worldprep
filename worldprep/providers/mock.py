@@ -89,6 +89,22 @@ class MockLLM:
                     "narrative_arc": "災難 → 重建 → 鐵道骨架 → 企業集中 → 今天的東京", "opening_15s": "先講關東大地震後的東京幾乎歸零",
                     "research_questions": ["德川幕府為何選江戶？"], "wow_details_to_verify": ["東京鐵塔 1958 年完工"],
                     "script_direction": "每段都回到重建", "visual_direction": "東京鐵塔、山手線"}
+        if task == "en_script":
+            def block(name):
+                m = re.search(rf"## {name}\n(.*?)(?:\n\n##|\Z)", prompt, re.S)
+                return m.group(1).splitlines() if m else []
+            scenes = [re.match(r"(s\d{3}) \[\w+\] ", ln) for ln in block("Scenes")]
+            return {"destination": "Tokyo", "titles": ["Why did Tokyo rise twice?", "Tokyo after the fire", "The city that rebuilt itself"],
+                    "scenes": [{"scene_id": m.group(1), "text": f"Tokyo scene {i} tells part of the story."} for i, m in enumerate(scenes) if m],
+                    "headings": [{"section": ln.split(":")[0], "heading": ln.split(":")[0].title()} for ln in block("Sections")],
+                    "slide_headlines": [{"scene_id": ln.split(":")[0], "headline": "Tokyo"} for ln in block("Slide headlines")],
+                    "charts": [{"scene_id": ln.split(":")[0], "title": "Milestones", "unit": "year", "labels": ["A", "B", "C"]}
+                               for ln in block("Charts")]}
+        if task == "en_meta":
+            return {"description_intro": "Why did Tokyo become a world capital?", "tags": ["Tokyo", "Japan"], "hashtags": ["#BeyondTravel"],
+                    "pinned_comment": "Which era of Tokyo would you visit?", "shorts_title": "Tokyo rose twice #Shorts",
+                    "shorts_description": "Full story: [YouTube video link] #BeyondTravel", "instagram_caption": "Tokyo was destroyed twice.",
+                    "threads_post": "Did you know Tokyo was destroyed twice? [YouTube video link]"}
         if task == "social":
             return {"shorts_title": "東京被摧毀兩次，為什麼還是世界之都？ #Shorts",
                     "shorts_description": "完整故事在這裡：【YouTube 正片連結】 #世界先修課 #東京 #城市",
@@ -140,7 +156,7 @@ class MockSlides:
     def get(self, prompt: str, out: Path, episode_id: int | None = None) -> ImageResult:
         return self.generate_many({"x": (prompt, out)}, episode_id)["x"]
 
-    def compose(self, prompt: str, references: list, out: Path, episode_id: int | None = None) -> ImageResult:
+    def compose(self, prompt: str, references: list, out: Path, episode_id: int | None = None, model=None, price=None) -> ImageResult:
         return self.get(prompt, out, episode_id)
 
 

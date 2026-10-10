@@ -1,6 +1,7 @@
 """短影音：從成品剪出開場 Hook＋品牌台詞，轉成直式（模糊背景），字幕加大放在下方模糊區，結尾接 5 秒導流定格。"""
 from pathlib import Path
 
+from .. import edition
 from ..config import get_settings
 from ..logging_setup import log
 from ..render import cards
@@ -11,7 +12,6 @@ from .subtitles import cues
 ENDCARD_SECONDS = 5.0
 W, H = cards.SHORTS_W, cards.SHORTS_H
 SUB_FONT_SIZE = 76
-SUB_MAX_CHARS = 12  # 直式畫面一行約可放 12 個大字
 SUB_MARGIN_BOTTOM = 400  # 落在橫式畫面下方的模糊區
 # 橫式畫面置中、上下用同一畫面的模糊放大版填滿
 VERTICAL = (f"split[a][b];[a]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=40:2,eq=brightness=-0.12[bg];"
@@ -37,7 +37,7 @@ def build_ass(timeline: list[dict], end: float) -> str:
         f"Style: Short,{font},{SUB_FONT_SIZE},&H00FFFFFF,&H00221006,&H80000000,1,1,5,0,2,60,60,{SUB_MARGIN_BOTTOM}",
         "", "[Events]", "Format: Layer, Start, End, Style, Text",
     ]
-    for a, b, text in cues([s for s in timeline if s["start"] < end], SUB_MAX_CHARS):
+    for a, b, text in cues([s for s in timeline if s["start"] < end], edition.current().short_sub_max):
         lines.append(f"Dialogue: 0,{_ass_time(a)},{_ass_time(min(b, end))},Short,{text}")
     return "\n".join(lines) + "\n"
 
@@ -55,7 +55,7 @@ def run(p, episode_id: int, force: bool = False) -> Path | None:
         log.warning("short_skipped", extra={"episode_id": episode_id, "brand_end": end})
         return None
     card = cards.shorts_endcard(st.path(episode_id, "thumbnails", "thumbnail.jpg"),
-                                st.path(episode_id, "thumbnails", "short_endcard.jpg"))
+                                st.path(episode_id, "thumbnails", "short_endcard.jpg"), edition.current().endcard_lines)
     ass = st.write_text(episode_id, "final", "short.ass", build_ass(timeline["scenes"], end))
     fade = 0.4
     graph = (
