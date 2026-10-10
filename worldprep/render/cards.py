@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
-from ..brand import CHANNEL_NAME, GOLD, GRAY, NAVY, NAVY_DEEP, SECONDARY_SLOGAN, SKY, SLOGAN, WHITE, ep_label, font_bold, font_regular
+from ..brand import CHANNEL_NAME, GOLD, GRAY, NAVY, NAVY_DEEP, SKY, WHITE, ep_label, font_bold, font_regular
 from .logo import icon
 
 W, H = 1920, 1080
@@ -143,31 +143,6 @@ def text_overlay(text: str, out: Path, watermark: bool = True) -> Path:
         img.alpha_composite(wm, (W - 140, 44))
     img.save(out)
     return out
-
-
-def opening_frames(out_dir: Path, hero: Path | None) -> list[tuple[Path, float]]:
-    """片頭 3 秒：目的地畫面+次標語 → Logo+主標語。"""
-    out_dir.mkdir(parents=True, exist_ok=True)
-    a = out_dir / "open_1.jpg"
-    if hero and hero.exists():
-        img = ImageEnhance.Brightness(_cover(Image.open(hero).convert("RGB"), (W, H))).enhance(0.5)
-    else:
-        img = _gradient()
-    d = ImageDraw.Draw(img)
-    f = _font(80)
-    d.text(((W - f.getlength(SECONDARY_SLOGAN)) / 2, H / 2 - 50), SECONDARY_SLOGAN, font=f, fill=WHITE)
-    img.save(a, quality=95)
-
-    b = out_dir / "open_2.jpg"
-    img = _gradient().convert("RGBA")
-    ic = icon(360)
-    img.alpha_composite(ic, ((W - 360) // 2, 220))
-    d = ImageDraw.Draw(img)
-    f1, f2 = _font(100), _font(52, False)
-    d.text(((W - f1.getlength(CHANNEL_NAME)) / 2, 610), CHANNEL_NAME, font=f1, fill=WHITE)
-    d.text(((W - f2.getlength(SLOGAN)) / 2, 760), SLOGAN, font=f2, fill=GOLD)
-    img.convert("RGB").save(b, quality=95)
-    return [(a, 1.4), (b, 1.8)]
 
 
 def _cover(img: Image.Image, size: tuple[int, int]) -> Image.Image:

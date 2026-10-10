@@ -27,12 +27,12 @@ class AzureVoice:
         self.key, self.region, self.voice = s.azure_speech_key, s.azure_speech_region, s.voice_name
 
     @with_retry()
-    def synthesize(self, text: str, out: Path, episode_id: int | None = None) -> VoiceResult:
+    def synthesize(self, text: str, out: Path, episode_id: int | None = None, rate: str = "-3%") -> VoiceResult:
         ssml = (
             '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" '
             'xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="zh-TW">'
             f'<voice name="{self.voice}"><mstts:express-as style="narration-professional">'
-            f'<prosody rate="-3%">{escape(text)}</prosody></mstts:express-as></voice></speak>'
+            f'<prosody rate="{rate}">{escape(text)}</prosody></mstts:express-as></voice></speak>'
         )
         r = httpx.post(
             f"https://{self.region}.tts.speech.microsoft.com/cognitiveservices/v1",
@@ -58,11 +58,11 @@ class EdgeVoice:
         self.voice = get_settings().voice_name
 
     @with_retry()
-    def synthesize(self, text: str, out: Path, episode_id: int | None = None) -> VoiceResult:
+    def synthesize(self, text: str, out: Path, episode_id: int | None = None, rate: str = "-3%") -> VoiceResult:
         import edge_tts
 
         mp3 = out.with_suffix(".mp3")
-        asyncio.run(edge_tts.Communicate(text, self.voice, rate="-3%").save(str(mp3)))
+        asyncio.run(edge_tts.Communicate(text, self.voice, rate=rate).save(str(mp3)))
         wav = out.with_suffix(".wav")
         # Edge 每段前後各帶約 0.2 / 0.9 秒靜音，段落接起來會變成一句一停；裁掉後由剪輯統一控制停頓
         run_ffmpeg(["-i", str(mp3), "-af", TRIM_SILENCE, "-ar", "48000", "-ac", "1", str(wav)])
@@ -80,7 +80,7 @@ class MockVoice:
 
     name = "mock"
 
-    def synthesize(self, text: str, out: Path, episode_id: int | None = None) -> VoiceResult:
+    def synthesize(self, text: str, out: Path, episode_id: int | None = None, rate: str = "-3%") -> VoiceResult:
         seconds = max(1.0, len(text) / (get_settings().narration_chars_per_minute / 60))
         wav = out.with_suffix(".wav")
         run_ffmpeg(["-f", "lavfi", "-i", f"sine=frequency=220:sample_rate=48000:duration={seconds:.2f}",

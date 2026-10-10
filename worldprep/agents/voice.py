@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from ..config import ROOT
+from ..config import ROOT, get_settings
 from ..logging_setup import log
 from ..storage import get_storage
 
@@ -19,6 +19,10 @@ def run(p, episode_id: int) -> None:
         r = p.voice.synthesize(sc["script_text"], st.path(episode_id, "audio", sid), episode_id)
         timings[sid] = {"file": str(r.path), "duration": r.duration, "chars": r.chars, "text": sc["script_text"]}
         st.write_json(episode_id, "audio", name, timings)
+    cfg = get_settings()
+    if not st.exists(episode_id, "audio", "brand.wav"):
+        # 固定品牌台詞（開頭第 15 秒後），語速另外設定以盡量貼近 2 秒
+        p.voice.synthesize(cfg.brand_line, st.path(episode_id, "audio", "brand"), episode_id, rate=cfg.brand_rate)
     if p.voice.name != "mock":
         calibrate(timings)
 

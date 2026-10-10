@@ -57,7 +57,7 @@ class VideoProvider(Protocol):
 class VoiceProvider(Protocol):
     name: str
 
-    def synthesize(self, text: str, out: Path, episode_id: int | None = None) -> VoiceResult: ...
+    def synthesize(self, text: str, out: Path, episode_id: int | None = None, rate: str = "-3%") -> VoiceResult: ...
 
 
 class TranscriptionProvider(Protocol):

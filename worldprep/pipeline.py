@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 
 from . import drive
 from .agents import edit, factcheck, metadata, notify, qa, research, script, storyboard, thumbnail, visual, voice
-from .agents.topic import retitle, select_topic
+from .agents.topic import full_titles, read_brief, retitle, select_topic
 from .db import audit, session, transition
 from .logging_setup import log
 from .models import Episode, ProductionJob
@@ -21,9 +21,10 @@ STAGE_ATTEMPTS = 2
 
 
 def _render_all(p, eid):
+    # 封面先做：影片第一幀要承接封面主視覺
+    thumbnail.run(p, eid)
     edit.run(p, eid)
     metadata.run(p, eid)
-    thumbnail.run(p, eid)
 
 
 @dataclass
@@ -253,9 +254,14 @@ def regenerate(p: Providers, eid: int, target: str, feedback: str = "") -> None:
     if target in ("title", "thumbnail"):
         if target == "title":
             retitle(p, eid, feedback)
-            metadata.run(p, eid, force=True)
+            with session() as s:
+                ep = s.get(Episode, eid)
+                ep.title = full_titles(read_brief(eid), ep.episode_number)[0]
         thumbnail.run(p, eid, feedback, force=True)
-        restart, from_stage = S.RENDERING, "qa"
+        # 影片第一幀是封面，封面或標題換了就重新剪輯（場景片段會沿用）
+        for area, name in (("final", "episode.mp4"), ("final", "metadata.json"), ("video", "timeline.json")):
+            st.path(eid, area, name).unlink(missing_ok=True)
+        restart, from_stage = S.VOICE_GENERATION, "render"
     else:
         for area in ("video", "final", "thumbnails", "subtitles"):
             st.clear(eid, area)

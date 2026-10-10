@@ -1,12 +1,14 @@
 from sqlalchemy import select
 
 from ..brand import BANNED_OPENINGS
-from ..config import get_settings
+from ..config import ROOT, get_settings
 from ..db import session
 from ..models import Episode, ResearchSource
 from ..storage import get_storage
 from .prompts import EDITORIAL_DNA
 from .topic import brief_for, read_brief, set_title
+
+OPENING_RULES = ROOT / "opening" / "opening_prompt.txt"
 
 SECTION_ORDER = ["hook", "geography", "history", "city", "business", "culture", "attractions", "closing"]
 
@@ -68,7 +70,8 @@ SCRIPT_RULES = """寫作規則：
 - 這是旁白稿，會被唸出來。口語、電影感、聰明、精簡、故事驅動。句子長短交錯，避免重複句型與明顯 AI 慣用語（例如「讓我們一起」「不僅…更是…」「在這個…的時代」「總而言之」）。
 - 敘事結構：問題 → 背景 → 歷史 → 轉變 → 商業 → 文化 → 今天看到的樣子。
 - sections 依序為 hook, geography, history, city, business, culture, attractions, closing。
-- hook（約 0:00–0:30）：以強烈問題、矛盾、驚人事實或畫面開場。禁止「大家好」「歡迎來到世界先修課」之類開場。
+- hook：開場 15 秒內講完（字數上限見下方），依照「開場規範」：第一句直接承接本集 YouTube 標題的問題（延伸而非逐字朗讀），接著用一個真實、反直覺的事實或矛盾讓觀眾想追下去，不在 hook 裡解答。禁止問候、頻道介紹、目錄式開場。
+- hook 之後影片會自動插入固定品牌台詞，腳本裡不要寫品牌台詞；geography 段落要直接接續 hook 的謎題，不可再說「大家好」「今天我們要介紹」「本集從五個面向」之類的話。
 - 每一段都要回答「觀眾為什麼要在乎」，並用 causal_link 說明它如何承接上一段、推動下一段。
 - culture 不是獨立段落，要連回歷史、城市、商業。
 - attractions 必須是整個故事的結果：不要說「這裡很漂亮」，要說「理解了 X，你再看這個地方，就會發現它其實是……」。
@@ -89,8 +92,17 @@ def script_text(script: dict) -> str:
     return "\n\n".join(p["text"] for sec in script["sections"] for p in sec["paragraphs"])
 
 
+def hook_char_limit() -> int:
+    """依實測語速換算 hook 可用字數（扣掉句間停頓）。"""
+    cfg = get_settings()
+    return int((cfg.hook_max_seconds - 1.0) * cfg.effective_chars_per_minute / 60)
+
+
 def structural_issues(script: dict, target_chars: int, valid_ids: set[int]) -> list[str]:
     issues = []
+    hook = sum(len(par["text"]) for sec in script["sections"] if sec["section"] == "hook" for par in sec["paragraphs"])
+    if hook > hook_char_limit():
+        issues.append(f"hook {hook} 字，超過 15 秒上限約 {hook_char_limit()} 字")
     order = [s["section"] for s in script["sections"]]
     filtered = [s for s in SECTION_ORDER if s in order]
     if order != filtered or any(x not in order for x in ["hook", "history", "city", "business", "culture", "attractions"]):
@@ -120,7 +132,9 @@ def run(p, episode_id: int, feedback: str = "") -> None:
     facts, fact_text = _facts(episode_id)
     valid = {f["id"] for f in facts}
     notes = st.path(episode_id, "research", "notes.md").read_text(encoding="utf-8")
-    system = f"{EDITORIAL_DNA}\n\n你是頻道首席紀錄片編劇。\n{SCRIPT_RULES}"
+    opening = OPENING_RULES.read_text(encoding="utf-8") if OPENING_RULES.exists() else ""
+    system = (f"{EDITORIAL_DNA}\n\n你是頻道首席紀錄片編劇。\n{SCRIPT_RULES}\n- hook 全段最多 {hook_char_limit()} 字。"
+              f"\n\n## 開場規範（頻道主提供；畫面、品牌動畫與剪輯由系統處理，你只負責 hook 旁白）\n{opening}")
     base = (
         f"目的地：{dest}\n本集核心問題：{angle}\n{brief_for(episode_id, 'script')}\n\n旁白總字數目標：約 {target} 字（依實測語速換算的 {get_settings().target_video_length_minutes} 分鐘）。\n\n"
         f"## 已查核事實（只能用這些具體數據）\n{fact_text}\n\n## 研究背景（脈絡參考，其中未查核的數字不可使用）\n{notes[:20000]}"

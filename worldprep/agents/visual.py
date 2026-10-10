@@ -49,7 +49,7 @@ SLIDE_STYLE = (
     "Create one 16:9 frame for a cinematic travel documentary on a Taiwanese YouTube channel about why places became what they are. "
     "The real local place is the hero: a recognizable landmark, old street, temple, riverside, mountain view or cityscape of the exact "
     "place and period described, shot like high-end travel photography (or an authentic archival photo for historical periods). "
-    "Full-bleed, natural light, rich detail, subtle deep navy (#0b1b3a) and warm gold (#d4a853) grading, consistent across the episode. "
+    "Fill the entire frame edge to edge: no black bars, no letterboxing, no borders or frames. Natural light, rich detail, subtle deep navy (#0b1b3a) and warm gold (#d4a853) grading, consistent across the episode. "
     "No fake documents with writing, no English, no logos, no watermark. Real historical people: never show a recognizable face "
     "(use back view, silhouette, distance, or their objects). Maps: simple stylized silhouette with at most two place labels. "
     "Keep the bottom 20% of the frame free of any text (subtitles go there)."
@@ -100,15 +100,24 @@ SLIDE_CHECK_SCHEMA = {
 SLIDE_CHECK_CHUNK = 20
 
 
-def check_slides(p, scenes: dict[str, dict], slides: dict[str, ImageResult], episode_id: int) -> set[str]:
-    """投影片上的字由生圖模型寫，逐張比對大標與數字，並檢查亂碼、真人臉孔、時代地點錯誤；回傳不合格的場景。"""
+def letterboxed(path: Path) -> bool:
+    """生圖偶爾自己加上下黑邊（電影寬銀幕感），在 16:9 影片裡會變成黑框。"""
     from PIL import Image
 
+    im = Image.open(path).convert("L").resize((64, 36))
+    row = lambda y: sum(im.getpixel((x, y)) for x in range(64)) / 64  # noqa: E731
+    return row(1) < 8 and row(34) < 8
+
+
+def check_slides(p, scenes: dict[str, dict], slides: dict[str, ImageResult], episode_id: int) -> set[str]:
+    """投影片上的字由生圖模型寫，逐張比對大標與數字，並檢查亂碼、真人臉孔、時代地點錯誤、黑邊；回傳不合格的場景。"""
+    from PIL import Image
+
+    bad: set[str] = {sid for sid, r in slides.items() if letterboxed(r.path)}
     if not slides or not hasattr(p.llm, "vision_json"):
-        return set()
+        return bad
     st = get_storage()
-    bad: set[str] = set()
-    ids = list(slides)
+    ids = [sid for sid in slides if sid not in bad]
     for i in range(0, len(ids), SLIDE_CHECK_CHUNK):
         chunk = ids[i:i + SLIDE_CHECK_CHUNK]
         images = []
@@ -117,7 +126,7 @@ def check_slides(p, scenes: dict[str, dict], slides: dict[str, ImageResult], epi
             Image.open(slides[sid].path).convert("RGB").resize((768, 432)).save(small, quality=85)
             images.append(small)
         def expected(sc: dict) -> str:
-            head = f"地名標籤「{sc['slide_headline']}」" if sc.get("slide_headline") else "沒有標籤（有任何文字就算 headline_correct=false）"
+            head = f"地名標籤「{sc['slide_headline']}」" if sc.get("slide_headline") else "應該完全沒有文字（圖上沒有任何字時 headline_correct=true；出現任何字才是 false）"
             num = f"數字「{sc['slide_number']}」" if sc.get("slide_number") else "沒有數字（number_correct 填 true）"
             return f"{head}，{num}"
 

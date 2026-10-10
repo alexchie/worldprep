@@ -2,7 +2,7 @@ from itertools import groupby
 
 from sqlalchemy import select
 
-from ..brand import SLOGAN, validate_title
+from ..brand import validate_title
 from ..config import get_settings
 from ..db import session
 from ..models import Asset, Episode, ResearchSource
@@ -119,7 +119,9 @@ def run(p, episode_id: int) -> bool:
     # Branding
     errs = validate_title(meta["title"], n)
     _check(r, "branding", "title_format", not errs, "; ".join(errs))
-    _check(r, "branding", "slogan_in_opening", meta.get("slogan") == SLOGAN and timeline["opening"] <= 4.0, f"opening {timeline['opening']}s")
+    hook_end, brand_end = timeline.get("hook_end", 0.0), timeline.get("brand_end", 0.0)
+    _check(r, "branding", "hook_within_limit", 0 < hook_end <= cfg.hook_max_seconds + 0.5, f"Hook {hook_end:.1f}s", critical=False)
+    _check(r, "branding", "brand_intro", brand_end > hook_end, f"品牌 {hook_end:.1f}–{brand_end:.1f}s", critical=False)
     _check(r, "branding", "thumbnail_exists", thumb.exists() and thumb.stat().st_size < 2 * 1024 * 1024)
 
     # Vision review (frames vs narration, AI artifacts, thumbnail)

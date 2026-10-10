@@ -61,13 +61,13 @@ def cover_references() -> list[Path]:
     return sorted(f for f in COVER_DIR.iterdir() if f.suffix.lower() in (".png", ".jpg", ".jpeg")) if COVER_DIR.exists() else []
 
 
-def plan_cover(p, episode_id: int, meta: dict, dest: str, n: int, feedback: str = "") -> dict:
+def plan_cover(p, episode_id: int, title: str, dest: str, n: int, feedback: str = "") -> dict:
     """依標題與企劃，填好封面規範第十一節的「本次任務輸入資料」。"""
     b = read_brief(episode_id) or {}
     return p.llm.json(
         "thumbnail", f"你是《{CHANNEL_NAME}》的縮圖藝術總監。以下是頻道主的封面規範，請嚴格遵守。\n\n{cover_memory()}",
-        f"請為本集填寫封面的「本次任務輸入資料」。\n\n集數：{ep_label(n)}\nYouTube 完整影片標題：{meta['title']}\n目的地：{dest}\n"
-        f"核心問題：{b.get('core_question', meta.get('thesis', ''))}\n畫面方向：{b.get('visual_direction', '')}\n\n"
+        f"請為本集填寫封面的「本次任務輸入資料」。\n\n集數：{ep_label(n)}\nYouTube 完整影片標題：{title}\n目的地：{dest}\n"
+        f"核心問題：{b.get('core_question', '')}\n畫面方向：{b.get('visual_direction', '')}\n\n"
         "欄位說明：\n"
         "- title_lines：縮圖主標題，分成 2–3 行（每行 4–11 字）。從上架標題取出最有吸引力的問題與關鍵詞，"
         "可以精簡，但不可加入標題沒有的事實；要像範本那樣是一個讓人想知道答案的問題。\n"
@@ -143,11 +143,10 @@ def run(p, episode_id: int, feedback: str = "", force: bool = False) -> Path:
     final = st.path(episode_id, "thumbnails", "thumbnail.jpg")
     if final.exists() and not force:
         return final
-    meta = st.read_json(episode_id, "final", "metadata.json")
     with session() as s:
         ep = s.get(Episode, episode_id)
-        n, dest = ep.episode_number, ep.destination
-    plan = plan_cover(p, episode_id, meta, dest, n, feedback)
+        n, dest, title = ep.episode_number, ep.destination, ep.title
+    plan = plan_cover(p, episode_id, title, dest, n, feedback)
     attempts = []
     if p.slides and hasattr(p.slides, "compose"):
         prompt, refs = cover_prompt(plan, n), cover_references()
