@@ -105,7 +105,10 @@ def run(p, episode_id: int) -> bool:
     _check(r, "technical", "has_audio", info.get("has_audio", False))
     dur = info.get("duration", 0)
     target = cfg.target_video_length_minutes * 60
-    _check(r, "technical", "duration", (abs(dur - target) / target <= 0.3) or cfg.mock, f"{dur:.0f}s vs target {target}s", critical=not cfg.mock)
+    # 只有明顯壞掉（不到目標一半）才擋下交付；不在 8–10 分鐘內則在通知信提醒
+    _check(r, "technical", "duration_not_broken", dur >= target * 0.5 or cfg.mock, f"{dur:.0f}s", critical=not cfg.mock)
+    _check(r, "technical", "duration_in_range", cfg.video_min_minutes * 60 <= dur <= cfg.video_max_minutes * 60 or cfg.mock,
+           f"片長 {dur / 60:.1f} 分鐘，目標 {cfg.video_min_minutes:.0f}–{cfg.video_max_minutes:.0f} 分鐘", critical=False)
     _check(r, "technical", "subtitles", srt.exists() and srt.stat().st_size > 100)
 
     # Audio

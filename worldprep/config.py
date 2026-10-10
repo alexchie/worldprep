@@ -14,7 +14,9 @@ class Settings(BaseSettings):
     storage_backend: str = "local"
     storage_root: Path = ROOT / "storage"
     log_dir: Path = ROOT / "logs"
-    target_video_length_minutes: int = 12
+    target_video_length_minutes: int = 9
+    video_min_minutes: float = 8.0
+    video_max_minutes: float = 10.0
     narration_chars_per_minute: int = 260
 
     anthropic_api_key: str = ""
