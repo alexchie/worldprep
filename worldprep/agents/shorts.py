@@ -4,7 +4,7 @@ from pathlib import Path
 from ..config import get_settings
 from ..logging_setup import log
 from ..render import cards
-from ..render.ffmpeg import FPS, media_duration, run_ffmpeg
+from ..render.ffmpeg import FPS, media_duration, poster_frame, run_ffmpeg
 from ..storage import get_storage
 from .subtitles import cues
 
@@ -51,7 +51,6 @@ def run(p, episode_id: int, force: bool = False) -> Path | None:
     if not final.exists() or not silent.exists() or end <= 0:
         log.warning("short_skipped", extra={"episode_id": episode_id, "brand_end": end})
         return None
-    cards.shorts_cover(st.path(episode_id, "thumbnails", "thumbnail.jpg"), st.path(episode_id, "thumbnails", "short_cover.jpg"))
     card = cards.shorts_endcard(st.path(episode_id, "thumbnails", "thumbnail.jpg"),
                                 st.path(episode_id, "thumbnails", "short_endcard.jpg"))
     ass = st.write_text(episode_id, "final", "short.ass", build_ass(timeline["scenes"], end))
@@ -72,5 +71,7 @@ def run(p, episode_id: int, force: bool = False) -> Path | None:
                 "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
                 "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-c:a", "aac", "-b:a", "160k",
                 "-movflags", "+faststart", out.name], cwd=out.parent)
+    # Shorts 封面＝短影音的第一個畫面（第一幀有 0.05 秒淡入，取 0.1 秒避開黑畫面）
+    poster_frame(out, st.path(episode_id, "thumbnails", "short_cover.jpg"), at=0.1)
     log.info("short_done", extra={"episode_id": episode_id, "seconds": round(media_duration(out), 1)})
     return out
