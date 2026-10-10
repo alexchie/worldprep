@@ -40,8 +40,9 @@ def test_full_mock_episode_delivery_and_daily_email():
     with session() as s:
         assert s.get(Episode, eid).status == "NOTIFIED"
 
+    # 同一天排程再觸發：已寄過信，不再寄「今日沒有新影片」
     assert send_daily_email(p) == []
-    assert "今日沒有新影片" in _outbox()[-1].name or "沒有新影片" in _outbox()[-1].read_text(encoding="utf-8")
+    assert len(_outbox()) == before + 1
 
     regenerate(p, eid, "title", "更有懸念")
     advance(p, eid)

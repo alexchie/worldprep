@@ -1,5 +1,6 @@
 import html
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
@@ -7,7 +8,7 @@ from ..brand import CHANNEL_NAME, SLOGAN, ep_label
 from ..config import get_settings
 from ..db import audit, session, transition
 from ..logging_setup import log
-from ..models import Episode
+from ..models import AuditLog, Episode
 from ..states import State
 from ..storage import get_storage
 
@@ -90,7 +91,15 @@ def send_daily(p) -> list[int]:
             ep.notified_at = datetime.now(timezone.utc)
             audit(s, "daily_email_sent", eid, to=cfg.email_to)
         log.info("daily_email_sent", extra={"episode_id": eid})
-    if not ids:
+    # 排程一天會觸發好幾次（GitHub 排程常延遲或漏跑）：當天寄過任何一封信，就不再寄「今日沒有新影片」
+    tz = ZoneInfo(cfg.timezone)
+    day_start = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).replace(tzinfo=None)
+    with session() as s:
+        sent_today = s.scalar(select(AuditLog.id).where(AuditLog.action.in_(["daily_email_sent", "daily_status_sent"]),
+                                                        AuditLog.timestamp >= day_start).limit(1))
+    if not ids and sent_today is None:
+        with session() as s:
+            audit(s, "daily_status_sent")
         with session() as s:
             ep = s.scalar(select(Episode).order_by(Episode.id.desc()))
             status = f"{ep_label(ep.episode_number)} {ep.destination}：{ep.status}" if ep else "尚無集數"
