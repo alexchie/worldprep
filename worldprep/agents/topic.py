@@ -117,7 +117,7 @@ def judge_titles(p, brief: dict, candidates: list[dict], episode_id: int | None 
     listing = "\n".join(f"- [{c['archetype']}] {c['main_title']}" for c in candidates)
     r = p.llm.json(
         "title_judge",
-        f"{EDITORIAL_DNA}\n\n你是頻道總編輯，負責挑標題。你的標準是：一個在 YouTube 首頁滑過去的台灣觀眾，"
+        f"{EDITORIAL_DNA}\n\n你是頻道總編輯，負責挑標題。你的標準是：一個在 YouTube 首頁滑過去、對這個地方幾乎不了解的華語觀眾，"
         "第一眼看到會不會停下來、覺得「這很有趣，我想知道答案」。下面是頻道主提供、實際表現很好的範本標題，請用同樣的嗅覺判斷。\n\n"
         + (ref.read_text(encoding="utf-8") if ref.exists() else ""),
         f"本集：{brief['destination']}\n觀眾熟悉的現象：{brief['familiar_phenomenon']}\n核心問題：{brief['core_question']}\n\n"

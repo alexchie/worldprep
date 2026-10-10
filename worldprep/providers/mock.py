@@ -60,7 +60,7 @@ class MockLLM:
         if task == "script_review":
             return {"pass": True, "coherent": True, "follows_structure": True, "hook_strong": True,
                     "natural_taiwanese_chinese": True, "sounds_ai_generated": False, "unsupported_sentences": [],
-                    "issues": [], "title_supported": False, "title_fix": "東京為什麼能成為世界之都？從江戶到今天的城市野心",
+                    "issues": [], "unexplained_terms": [], "title_supported": False, "title_fix": "東京為什麼能成為世界之都？從江戶到今天的城市野心",
                     "score": 8.5}
         if task == "storyboard":
             sids = re.findall(r"^(s\d{3}) ", prompt, re.M)

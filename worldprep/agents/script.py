@@ -56,13 +56,14 @@ REVIEW_SCHEMA = {
         "natural_taiwanese_chinese": {"type": "boolean"},
         "sounds_ai_generated": {"type": "boolean"},
         "unsupported_sentences": {"type": "array", "items": {"type": "string"}},
+        "unexplained_terms": {"type": "array", "items": {"type": "string"}},
         "issues": {"type": "array", "items": {"type": "string"}},
         "title_supported": {"type": "boolean"},
         "title_fix": {"type": "string"},
         "score": {"type": "number"},
     },
     "required": ["pass", "coherent", "follows_structure", "hook_strong", "natural_taiwanese_chinese",
-                 "sounds_ai_generated", "unsupported_sentences", "issues", "title_supported", "title_fix", "score"],
+                 "sounds_ai_generated", "unsupported_sentences", "unexplained_terms", "issues", "title_supported", "title_fix", "score"],
     "additionalProperties": False,
 }
 
@@ -72,6 +73,12 @@ SCRIPT_RULES = """寫作規則：
 - sections 依序為 hook, geography, history, city, business, culture, attractions, closing。
 - hook：開場 15–23 秒講完（字數範圍見下方），依照「開場規範」：第一句直接承接本集 YouTube 標題的問題（延伸而非逐字朗讀），接著用一個真實、反直覺的事實或矛盾讓觀眾想追下去，不在 hook 裡解答。禁止問候、頻道介紹、目錄式開場。
 - hook 之後影片會自動插入固定品牌台詞，腳本裡不要寫品牌台詞；geography 段落要直接接續 hook 的謎題，不可再說「大家好」「今天我們要介紹」「本集從五個面向」之類的話。
+- 觀眾對這個地方幾乎一無所知：
+  · geography 段落開頭先用 2–3 句幫觀眾定位：在世界的哪一區、靠什麼海或鄰近哪些國家、是哪個國家的哪種城市、主要說什麼語言。不要拿特定國家（包括台灣）比距離或大小。
+  · 每個地名、人名、事件第一次出現時，用一句白話說明它是什麼、在哪裡、是誰（例如「西班牙——當年歐洲最強的海上帝國之一——」）。
+  · 全集只保留真正推動故事的專有名詞，地名與人名合計約 8–10 個；其他用描述代替（例如「河口北邊的老商業區」）。attractions 段落可以點名景點，但要說明它是什麼。
+  · 講到殖民、戰爭、改朝換代時，先用一句話交代是誰、為什麼來，不預設觀眾知道。
+  · 少用確切年份，能用「大約四百年前」「一百多年後」就不寫年份；需要年份時一段最多一個。
 - 每一段都要回答「觀眾為什麼要在乎」，並用 causal_link 說明它如何承接上一段、推動下一段。
 - culture 不是獨立段落，要連回歷史、城市、商業。
 - attractions 必須是整個故事的結果：不要說「這裡很漂亮」，要說「理解了 X，你再看這個地方，就會發現它其實是……」。
@@ -156,15 +163,17 @@ def run(p, episode_id: int, feedback: str = "") -> None:
             f"{EDITORIAL_DNA}\n\n你是嚴格的總編輯，負責腳本審查。",
             "審查以下旁白稿：故事是否連貫？是否遵循 歷史→城市→商業→文化→景點 的因果鏈？hook 是否夠強？"
             "是否有未被已查核事實支持的主張（列出原句）？是否是自然的台灣繁體中文、不學術、不像 AI 寫的？有無不必要的重複？"
+            "unexplained_terms：假設觀眾對這個地方一無所知，列出他們聽不懂、腳本卻沒有用白話解釋的地名、人名、事件或概念；專有名詞明顯太多時也列在這裡。"
             "腳本是否走製作人指定的敘事弧線、開頭 hook 是否做到要求？"
             "title_supported：標題的每個承諾（數字、情緒詞、因果）是否都被已查核事實與腳本兌現；若否，title_fix 寫一個符合同一原型、"
             "只承諾已兌現內容的修正版主標題（30 字以內，不含「｜世界先修課 EP.xx」），若是則留空字串。"
-            "score 0-10，>=7.5 且無未支持主張才 pass。\n\n"
+            "score 0-10，>=7.5、無未支持主張且無 unexplained_terms 才 pass。\n\n"
             f"{brief_for(episode_id, 'review')}\n\n## 腳本\n{script_text(script)}",
             REVIEW_SCHEMA, episode_id, effort="medium",
             cached_prefix=f"## 已查核事實（審查依據）\n{fact_text}",
         )
-        issues += review["issues"] + [f"未支持的主張：{x}" for x in review["unsupported_sentences"]]
+        issues += (review["issues"] + [f"未支持的主張：{x}" for x in review["unsupported_sentences"]]
+                   + [f"觀眾聽不懂、需要白話解釋或刪掉：{x}" for x in review["unexplained_terms"]])
         if review["pass"] and not structural_issues(script, target, valid):
             break
         if round_ == 1:
