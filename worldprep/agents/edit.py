@@ -120,10 +120,12 @@ def run(p, episode_id: int) -> None:
         elif not clip.exists() or abs(media_duration(clip) - dur) > 0.15:
             if m.get("map") and motion.available():
                 map_jobs.append((m, dur, clip, fade, sc.get("camera_motion", "static")))
-            elif m.get("media_type") == "video":
+            elif m.get("media_type") == "video" and Path(m["file_path"]).exists():
                 pending.append((video_clip, (Path(m["file_path"]), Path(m["overlay"]), dur, clip, fade)))
             else:
-                pending.append((image_clip, (Path(m["file_path"]), Path(m["overlay"]), dur, sc.get("camera_motion", "zoom_in"), clip, fade)))
+                # 已交付集數的雲端存檔不含影片素材，重做時改用它的定格畫面
+                src = Path(m["file_path"]) if m.get("media_type") != "video" else Path(m.get("poster") or m["file_path"])
+                pending.append((image_clip, (src, Path(m["overlay"]), dur, sc.get("camera_motion", "zoom_in"), clip, fade)))
         video_parts.append(clip)
         audio_parts += [Path(voice["file"]), silence(pad, adir / f"pad_{pad:.2f}.wav")]
         timeline.append({"scene_id": sid, "section": sc["section"], "heading": sc["heading"], "section_start": sc["section_start"],

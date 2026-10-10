@@ -33,6 +33,8 @@ def _deliver_all(p, eid):
 
 def _render_all(p, eid):
     # 封面先做：影片第一幀要承接封面主視覺
+    # 已交付集數的雲端存檔不含配音檔；重做時先補回缺少的配音（已存在的會略過）
+    voice.run(p, eid)
     thumbnail.run(p, eid)
     edit.run(p, eid)
     shorts.run(p, eid)
