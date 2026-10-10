@@ -70,8 +70,8 @@ REVIEW_SCHEMA = {
 
 SCRIPT_RULES = """寫作規則：
 - 這是旁白稿，會被唸出來。口語、電影感、聰明、精簡、故事驅動。句子長短交錯，避免重複句型與明顯 AI 慣用語（例如「讓我們一起」「不僅…更是…」「在這個…的時代」「總而言之」）。
-- 敘事結構：問題 → 背景 → 歷史 → 轉變 → 商業 → 文化 → 今天看到的樣子。
-- sections 依序為 hook, geography, history, city, business, culture, attractions, closing。
+- 這是 5–7 分鐘的短片，只講一個有趣的故事：一條主線、幾個讓人驚呼的細節，不要面面俱到、不要講太深。
+- sections 從 hook, geography, history, city, business, culture, attractions, closing 中挑故事需要的使用（順序不變），一定要有 hook 與 closing，其餘只在故事需要時才寫；寧可少段落也不要每段都蜻蜓點水。
 - hook：開場 15–23 秒講完（字數範圍見下方），依照「開場規範」：第一句直接承接本集 YouTube 標題的問題（延伸而非逐字朗讀），接著用一個真實、反直覺的事實或矛盾讓觀眾想追下去，不在 hook 裡解答。禁止問候、頻道介紹、目錄式開場。
 - hook 之後影片會自動插入固定品牌台詞，腳本裡不要寫品牌台詞；geography 段落要直接接續 hook 的謎題，不可再說「大家好」「今天我們要介紹」「本集從五個面向」之類的話。
 - 觀眾對這個地方幾乎一無所知：
@@ -89,8 +89,7 @@ SCRIPT_RULES = """寫作規則：
   · 可以有輕輕帶過的幽默或口語吐槽，但不輕浮、不拿當地文化或族群開玩笑。
   · 禁止課本寫法：不連續兩句都以年份開頭，不寫「……是……的重要……」「……具有重要意義」這類句子，不列年表。
 - 每一段都要回答「觀眾為什麼要在乎」，並用 causal_link 說明它如何承接上一段、推動下一段。
-- culture 不是獨立段落，要連回歷史、城市、商業。
-- attractions 必須是整個故事的結果：不要說「這裡很漂亮」，要說「理解了 X，你再看這個地方，就會發現它其實是……」。
+- 結尾要回到旅人今天能親眼看到的地方：不要說「這裡很漂亮」，要說「知道了這個故事，你再去看，就會發現……」。
 - closing 用一兩句收束核心問題，自然帶出「先看懂世界，再出發。」，不要喊口號式結尾、不要求訂閱。
 - 只能使用提供的已查核事實中的數字、日期、排名與公司資訊；每段在 claim_ids 標註用到的事實編號。沒有查核過的具體數字一律不要寫。
 - 段落長度約 60–140 字，方便配畫面。"""
@@ -126,8 +125,8 @@ def structural_issues(script: dict, target_chars: int, valid_ids: set[int]) -> l
         issues.append(f"hook {hook} 字，應在 {hook_char_min()}–{hook_char_limit()} 字之間（15–23 秒）")
     order = [s["section"] for s in script["sections"]]
     filtered = [s for s in SECTION_ORDER if s in order]
-    if order != filtered or any(x not in order for x in ["hook", "history", "city", "business", "culture", "attractions"]):
-        issues.append(f"段落順序或缺漏不符合 歷史→城市→商業→文化→景點：{order}")
+    if order != filtered or "hook" not in order or "closing" not in order:
+        issues.append(f"段落順序不對或缺少 hook／closing：{order}")
     text = script_text(script)
     first = text[:40]
     for b in BANNED_OPENINGS:
@@ -170,7 +169,7 @@ def run(p, episode_id: int, feedback: str = "") -> None:
         review = p.llm.json(
             "script_review",
             f"{EDITORIAL_DNA}\n\n你是嚴格的總編輯，負責腳本審查。",
-            "審查以下旁白稿：故事是否連貫？是否遵循 歷史→城市→商業→文化→景點 的因果鏈？hook 是否夠強？"
+            "審查以下旁白稿：故事是否連貫？是否專注講好一個有趣的故事、沒有面面俱到或講得太深？hook 是否夠強？"
             "是否有未被已查核事實支持的主張（列出原句）？是否是自然的台灣繁體中文、不學術、不像 AI 寫的？有無不必要的重複？"
             "unexplained_terms：假設觀眾對這個地方一無所知，列出他們聽不懂、腳本卻沒有用白話解釋的地名、人名、事件或概念；專有名詞明顯太多時也列在這裡。"
             "boring_passages：列出像在唸課本的段落開頭（從年份或概述開始、年表式列舉、「具有重要意義」這類句子、沒有場景與人物），並說明怎麼改成故事。"

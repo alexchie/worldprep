@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     storage_backend: str = "local"
     storage_root: Path = ROOT / "storage"
     log_dir: Path = ROOT / "logs"
-    target_video_length_minutes: int = 9
-    video_min_minutes: float = 8.0
-    video_max_minutes: float = 10.0
+    target_video_length_minutes: int = 6
+    video_min_minutes: float = 5.0
+    video_max_minutes: float = 7.0
     narration_chars_per_minute: int = 260
 
     anthropic_api_key: str = ""
@@ -68,6 +68,11 @@ class Settings(BaseSettings):
 
     daily_budget_usd: float = 15.0
     episode_budget_usd: float = 12.0
+    # 每集各家 API 上限（中英文版合計）：超過就改用較便宜的模型與免費資料來源（維基百科、Pixabay、Wikimedia）
+    claude_episode_budget_usd: float = 2.0
+    gemini_episode_budget_usd: float = 2.0
+    gemini_cover_reserve_usd: float = 0.6  # 留給中英文封面，投影片不可用掉這部分
+    research_max_searches: int = 8
 
     schedule_produce: str = "18:00"
     schedule_email: str = "08:00"

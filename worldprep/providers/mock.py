@@ -153,10 +153,11 @@ class MockSlides:
             out[k] = r
         return out
 
-    def get(self, prompt: str, out: Path, episode_id: int | None = None) -> ImageResult:
+    def get(self, prompt: str, out: Path, episode_id: int | None = None, reserve: float = 0.0) -> ImageResult:
         return self.generate_many({"x": (prompt, out)}, episode_id)["x"]
 
-    def compose(self, prompt: str, references: list, out: Path, episode_id: int | None = None, model=None, price=None) -> ImageResult:
+    def compose(self, prompt: str, references: list, out: Path, episode_id: int | None = None, model=None, price=None,
+                reserve: float = 0.0) -> ImageResult:
         return self.get(prompt, out, episode_id)
 
 

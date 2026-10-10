@@ -50,8 +50,18 @@ class ClaudeProvider:
         self.batch_wait = s.batch_wait_minutes * 60
         self.client = anthropic.Anthropic(api_key=s.anthropic_api_key or None, max_retries=4, timeout=900)
 
-    def model_for(self, task: str) -> str:
-        return self.models[TASK_TIER.get(task, "sonnet")]
+    def model_for(self, task: str, episode_id: int | None = None) -> str:
+        """依工作分配模型；本集 Claude 花費接近上限時自動降級（6 成：Opus→Sonnet；8 成 5：一律 Haiku）。"""
+        tier = TASK_TIER.get(task, "sonnet")
+        if episode_id is not None:
+            spent, cap = costs.provider_total(episode_id, "anthropic"), get_settings().claude_episode_budget_usd
+            if spent >= cap * 0.85:
+                tier = "haiku"
+            elif spent >= cap * 0.6 and tier == "opus":
+                tier = "sonnet"
+            if tier != TASK_TIER.get(task, "sonnet"):
+                log.info("claude_downgraded", extra={"task": task, "tier": tier, "spent": round(spent, 3)})
+        return self.models[tier]
 
     @staticmethod
     def _is_haiku(model: str) -> bool:
@@ -96,7 +106,7 @@ class ClaudeProvider:
         return None
 
     def _call(self, task: str, episode_id: int | None, effort: str | None = None, fmt: dict | None = None, **kw):
-        model = self.model_for(task)
+        model = self.model_for(task, episode_id)
         params = self._params(model, effort, fmt, **kw)
         started = time.monotonic()
         discount = 1.0
@@ -128,9 +138,9 @@ class ClaudeProvider:
     def _text(msg) -> str:
         return "".join(b.text for b in msg.content if b.type == "text")
 
-    def _user(self, task: str, prompt: str, cached_prefix: str | None) -> list[dict]:
+    def _user(self, task: str, prompt: str, cached_prefix: str | None, episode_id: int | None = None) -> list[dict]:
         """cached_prefix：同一模型會重複送出的大段內容（例如已查核事實），放最前面並設 1 小時快取。"""
-        if not cached_prefix or self._is_haiku(self.model_for(task)):
+        if not cached_prefix or self._is_haiku(self.model_for(task, episode_id)):
             return [{"role": "user", "content": (cached_prefix + "\n\n" if cached_prefix else "") + prompt}]
         return [{"role": "user", "content": [
             {"type": "text", "text": cached_prefix, "cache_control": {"type": "ephemeral", "ttl": "1h"}},
@@ -140,7 +150,7 @@ class ClaudeProvider:
     def json(self, task: str, system: str, prompt: str, schema: dict, episode_id: int | None = None,
              effort: str | None = None, cached_prefix: str | None = None) -> Any:
         msg = self._call(task, episode_id, effort=effort, fmt={"type": "json_schema", "schema": schema},
-                         system=system, messages=self._user(task, prompt, cached_prefix))
+                         system=system, messages=self._user(task, prompt, cached_prefix, episode_id))
         return json.loads(self._text(msg))
 
     def vision_json(self, task: str, system: str, prompt: str, images: list, schema: dict, episode_id: int | None = None) -> Any:
@@ -159,8 +169,9 @@ class ClaudeProvider:
                                      messages=[{"role": "user", "content": prompt}]))
 
     def research(self, task: str, system: str, prompt: str, episode_id: int | None = None,
-                 max_searches: int = 25) -> ResearchResult:
-        model = self.model_for(task)
+                 max_searches: int | None = None) -> ResearchResult:
+        model = self.model_for(task, episode_id)
+        max_searches = max_searches or get_settings().research_max_searches
         tool_type = "web_search_20250305" if self._is_haiku(model) else "web_search_20260209"
         tools = [{"type": tool_type, "name": "web_search", "max_uses": max_searches}]
         # 搜尋達到伺服器迴圈上限（pause_turn）時會帶著同樣的前文續傳，自動快取讓續傳只付快取價

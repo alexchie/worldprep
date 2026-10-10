@@ -62,7 +62,18 @@ class GeminiSlides:
         return out
 
     @with_retry(attempts=3)
-    def get(self, prompt: str, out: Path, episode_id: int | None = None) -> ImageResult | None:
+    def left(self, episode_id: int | None, reserve: float = 0.0) -> float:
+        """本集 Gemini 還能花多少（扣掉保留額度）。"""
+        if episode_id is None:
+            return float("inf")
+        return get_settings().gemini_episode_budget_usd - costs.provider_total(episode_id, "gemini") - reserve
+
+    def _guard(self, episode_id: int | None, price: float, reserve: float = 0.0) -> None:
+        if price > self.left(episode_id, reserve):
+            raise costs.BudgetExceeded(f"本集 Gemini 已接近上限 {get_settings().gemini_episode_budget_usd} USD")
+
+    def get(self, prompt: str, out: Path, episode_id: int | None = None, reserve: float = 0.0) -> ImageResult | None:
+        self._guard(episode_id, self.price, reserve)
         r = self.client.interactions.create(model=self.model, input=prompt,
                                             response_format={"type": "image", "mime_type": "image/jpeg", **IMAGE_CONFIG})
         path = out.with_suffix(".jpg")
@@ -72,12 +83,13 @@ class GeminiSlides:
 
     @with_retry(attempts=3)
     def compose(self, prompt: str, references: list[Path], out: Path, episode_id: int | None = None,
-                model: str | None = None, price: float | None = None) -> ImageResult:
+                model: str | None = None, price: float | None = None, reserve: float = 0.0) -> ImageResult:
         """帶參考圖生成單張圖：封面用較強的模型、參考圖當系列設計規範；也用來把投影片上的中文字換成英文。"""
         from google.genai import types
 
         s = get_settings()
         model, price = model or s.cover_model, s.cover_price_usd if price is None else price
+        self._guard(episode_id, price, reserve)
         parts = [types.Part.from_bytes(data=ref.read_bytes(), mime_type="image/png" if ref.suffix.lower() == ".png" else "image/jpeg")
                  for ref in references]
         r = self.client.models.generate_content(
@@ -93,11 +105,16 @@ class GeminiSlides:
         return self._result(path)
 
     def generate_many(self, jobs: dict[str, tuple[str, Path]], episode_id: int) -> dict[str, ImageResult]:
-        """jobs: {scene_id: (prompt, out_path)}；超出預算的場景不生成，交給呼叫端改用其他素材。"""
+        """jobs: {scene_id: (prompt, out_path)}；超出 Gemini 上限（扣掉封面保留額度）的場景不生成，交給呼叫端改用免費圖庫。"""
         if not jobs:
             return {}
         done: dict[str, ImageResult] = {}
-        if self.batch and len(jobs) >= MIN_BATCH and costs.check_budget(episode_id, len(jobs) * self.price * 0.5):
+        reserve = get_settings().gemini_cover_reserve_usd
+        affordable = int(max(0.0, self.left(episode_id, reserve)) // (self.price * 0.5)) if episode_id is not None else len(jobs)
+        if affordable < len(jobs):
+            log.warning("slides_over_budget", extra={"episode_id": episode_id, "requested": len(jobs), "affordable": affordable})
+            jobs = dict(list(jobs.items())[:affordable])
+        if self.batch and len(jobs) >= MIN_BATCH:
             try:
                 done = self._batched(jobs, episode_id)
             except Exception as e:
@@ -105,10 +122,10 @@ class GeminiSlides:
         for k, (prompt, out) in jobs.items():
             if k in done:
                 continue
-            if not costs.check_budget(episode_id, self.price):
+            if self.price > self.left(episode_id, reserve) or not costs.check_budget(episode_id, self.price):
                 break
             try:
-                r = self.get(prompt, out, episode_id)
+                r = self.get(prompt, out, episode_id, reserve)
             except Exception as e:
                 log.warning("slide_failed", extra={"episode_id": episode_id, "scene": k, "err": str(e)[:300]})
                 continue

@@ -65,8 +65,7 @@ def run(p, episode_id: int) -> bool:
     issues = [i for i in structural_issues(script, cfg.target_chars, valid_ids) if "總字數" not in i and not i.startswith("hook ")]
     _check(r, "content", "story_structure", not issues, "; ".join(issues))
     order = [x["section"] for x in script["sections"]]
-    _check(r, "content", "history_city_business_culture_attractions",
-           [x for x in SECTION_ORDER if x in order] == order and all(x in order for x in ("history", "city", "business", "culture", "attractions")))
+    _check(r, "content", "section_order", [x for x in SECTION_ORDER if x in order] == order and "hook" in order, critical=False)
     if review:
         _check(r, "content", "coherent", review["coherent"], critical=False)
         _check(r, "content", "hook_strong", review["hook_strong"], critical=False)

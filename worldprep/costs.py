@@ -50,6 +50,14 @@ def episode_total(episode_id: int) -> float:
         return float(s.scalar(select(func.coalesce(func.sum(Cost.actual_cost), 0)).where(Cost.episode_id == episode_id)))
 
 
+def provider_total(episode_id: int | None, provider: str) -> float:
+    if episode_id is None:
+        return 0.0
+    with session() as s:
+        return float(s.scalar(select(func.coalesce(func.sum(Cost.actual_cost), 0))
+                              .where(Cost.episode_id == episode_id, Cost.provider == provider)))
+
+
 def today_total() -> float:
     tz = ZoneInfo(get_settings().timezone)
     start = datetime.combine(datetime.now(tz).date(), time.min, tz).astimezone(timezone.utc)

@@ -50,9 +50,11 @@ BRIEF_SCHEMA = {
         "wow_details_to_verify": {"type": "array", "items": {"type": "string"}},
         "script_direction": {"type": "string"},
         "visual_direction": {"type": "string"},
+        "search_keywords_en": {"type": "array", "items": {"type": "string"}},
     },
     "required": ["destination", "region", "familiar_phenomenon", "archetype", "core_question", "titles", "narrative_arc",
-                 "opening_15s", "research_questions", "wow_details_to_verify", "script_direction", "visual_direction"],
+                 "opening_15s", "research_questions", "wow_details_to_verify", "script_direction", "visual_direction",
+                 "search_keywords_en"],
     "additionalProperties": False,
 }
 
@@ -70,7 +72,9 @@ PRODUCER_ROLE = """你是本集的專案負責人（製作人）。你先決定�
   · 範本標題只學套路，不可照抄或只替換名詞。
   此時還沒研究，標題裡的數字或專有事實必須是你有把握、且研究時會被查核的；之後若查核不支持，審查階段會改標題。
 - region：從 亞洲城市、歐洲城市、北美城市、新興城市、國家、地區、歐亞交界、大洋洲城市 中選一個。
-- research_questions：研究員要回答的 5–8 個具體問題，要能同時支撐標題的承諾與 歷史→城市→商業→文化→景點 的因果鏈。
+- 本集只講一個有趣的故事（約 5–7 分鐘），不要面面俱到、不要講太深；五個面向只在故事需要時帶到。
+- research_questions：研究員要回答的 3–5 個具體問題，都要直接支撐這個故事與標題的承諾。
+- search_keywords_en：2–3 組英文關鍵字（用來查英文維基百科），例如「Kyoto kimono」「Nishijin weaving」。
 - wow_details_to_verify：3–5 個可能讓觀眾說「真的假的？」的細節，交給研究與查核去證實或推翻。
 - script_direction：給編劇的指示（敘事弧線怎麼落到各段、每個標題承諾要在哪裡兌現、結尾如何回到對旅人的意義）。
 - visual_direction：給分鏡與縮圖的畫面方向（主視覺、一定要出現的地點或物件）。"""

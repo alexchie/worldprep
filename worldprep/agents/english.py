@@ -111,7 +111,8 @@ def _retext(p, sc: dict, zh_scene: dict, src: Path, out: Path, episode_id: int):
     prompt = (f'Edit this image: replace the Chinese text "{zh_scene["slide_headline"]}" with the English text "{sc["slide_headline"]}" '
               f"in the same position, size and style.{number} Keep everything else in the image exactly the same. "
               "No other text, no Chinese characters.")
-    return p.slides.compose(prompt, [src], out, episode_id, model=s.slide_model, price=s.slide_price_usd)
+    # 保留一點額度給英文封面
+    return p.slides.compose(prompt, [src], out, episode_id, model=s.slide_model, price=s.slide_price_usd, reserve=0.3)
 
 
 def build_assets(p, episode_id: int, scenes: list[dict], zh_scenes: dict, zh_manifest: dict) -> dict:

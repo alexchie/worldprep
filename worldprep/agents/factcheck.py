@@ -3,6 +3,7 @@ from sqlalchemy import select
 from ..db import audit, session
 from ..models import Episode, ResearchSource
 from ..storage import get_storage
+from ..providers import freesources
 from .prompts import EDITORIAL_DNA, SOURCE_POLICY
 
 VERDICT_SCHEMA = {
@@ -47,10 +48,12 @@ def run(p, episode_id: int) -> None:
     if not st.exists(episode_id, "research", "factcheck_notes.md"):
         system = f"{EDITORIAL_DNA}\n\n你是嚴格的事實查核員，與原研究員無關。{SOURCE_POLICY}"
         listing = "\n".join(f"[{c['id']}] {c['claim']}（原來源：{c['source']} {c['source_url']} {c['source_date']}）" for c in claims)
+        free = st.read_json(episode_id, "research", "free_sources.json") if st.exists(episode_id, "research", "free_sources.json") else []
         prompt = (
-            f"目的地：{dest}。請用網路搜尋獨立查核下列每一條 claim，特別注意人口、GDP、日期、歷史事件、排名、公司資訊、統計、地理、政治與經濟主張。\n"
-            "每條都要寫出：[id] 判定（正確 / 需修正或加限定 / 無法證實 / 錯誤）、查到的權威來源名稱、網址、資料日期，以及修正後的正確敘述。\n"
-            "統計數字請以最新官方資料為準並標明年份。\n\n" + listing
+            f"目的地：{dest}。請獨立查核下列每一條 claim，特別注意日期、人名、數字、排名與因果主張。\n"
+            "先用下方的免費資料（維基百科）核對；免費資料無法確認的關鍵 claim，才用網路搜尋（搜尋次數有限，留給最重要的數字與年份）。\n"
+            "每條都要寫出：[id] 判定（正確 / 需修正或加限定 / 無法證實 / 錯誤）、依據的來源名稱、網址，以及修正後的正確敘述。\n\n"
+            + listing + f"\n\n## 免費資料（維基百科）\n{freesources.as_text(free) or '（無）'}"
         )
         r = p.research.research("factcheck", system, prompt, episode_id)
         st.write_text(episode_id, "research", "factcheck_notes.md", r.text)

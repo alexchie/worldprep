@@ -5,7 +5,8 @@ from ..db import session
 from ..models import Episode, ResearchSource
 from ..storage import get_storage
 from .prompts import EDITORIAL_DNA, SOURCE_POLICY
-from .topic import brief_for
+from ..providers import freesources
+from .topic import brief_for, read_brief
 
 SECTIONS = ["geography", "history", "city", "business", "culture", "attractions"]
 
@@ -45,21 +46,26 @@ def run(p, episode_id: int) -> None:
         dest, angle = ep.destination, ep.topic
 
     if not st.exists(episode_id, "research", "notes.md"):
+        # 先讀免費的維基百科條目；付費的網路搜尋只補缺口（每集有 Claude 花費上限）
+        brief = read_brief(episode_id) or {}
+        docs = freesources.gather([(dest, "zh"), (f"{dest} {angle}"[:60], "zh")]
+                                  + [(k, "en") for k in brief.get("search_keywords_en", [])[:3]])
+        st.write_json(episode_id, "research", "free_sources.json", docs)
         system = f"{EDITORIAL_DNA}\n\n你是研究員。{SOURCE_POLICY}"
         prompt = (
             f"目的地：{dest}\n本集核心問題：{angle}\n\n{brief_for(episode_id, 'research')}\n\n"
-            f"請用網路搜尋，為一支約 {get_settings().target_video_length_minutes} 分鐘的紀錄片收集研究資料。只挑能解釋「今天的樣子」的關鍵事實，不要寫完整通史。\n"
-            "觀眾對這個地方幾乎一無所知，所以先整理定位用的基本資料：位於世界哪一區、鄰近哪些海與國家、屬於哪個國家、人口、主要語言與宗教。"
-            "故事中會出現的關鍵人物與外來勢力，也各寫一句「他們是誰、為什麼會來」。\n"
-            "涵蓋：地理位置為何重要（貿易、防禦、移民、氣候、港口、交通）；塑造今日的關鍵歷史事件；城市結構、人口、交通、建築、主要區域；"
-            "主要產業、貿易、代表企業、金融、經濟政策與全球連結（這座城市怎麼賺錢、為什麼產業在這裡發展）；"
-            "歷史+城市+商業如何塑造食物、生活方式、語言、娛樂、宗教、社會規範；最後是能被前述故事解釋的代表景點。\n"
-            "每一個具體事實（數字、日期、排名、公司資訊）後面都附上來源名稱、網址與資料日期。"
-            "人口、GDP 等統計請用最新官方數字並註明年份。整理成條列式研究筆記（繁體中文）。"
+            f"為一支約 {get_settings().target_video_length_minutes} 分鐘、只講一個有趣故事的短紀錄片收集研究資料。"
+            "不要寫通史、不要面面俱到：只挑能回答本集核心問題、而且讓人覺得「真的假的？」的具體事實、人物、場景與細節。\n"
+            "觀眾對這個地方幾乎一無所知，所以附上 2–3 句定位資料（在世界哪一區、屬於哪個國家、主要語言）；"
+            "故事中出現的關鍵人物也各寫一句「他們是誰」。\n"
+            "先使用下方的免費資料（維基百科）；它們不足以回答的地方，才用網路搜尋補充（搜尋次數有限，請用在最關鍵的缺口）。\n"
+            "每一個具體事實（數字、日期、排名、人名）後面都附上來源名稱與網址（維基百科條目也可以當來源）。整理成條列式研究筆記（繁體中文）。\n\n"
+            f"## 免費資料（維基百科）\n{freesources.as_text(docs) or '（無）'}"
         )
         r = p.research.research("research", system, prompt, episode_id)
         st.write_text(episode_id, "research", "notes.md", r.text)
-        st.write_json(episode_id, "research", "search_sources.json", r.sources)
+        st.write_json(episode_id, "research", "search_sources.json",
+                      r.sources + [{"url": d["url"], "title": f"Wikipedia - {d['title']}", "page_age": ""} for d in docs])
 
     if st.exists(episode_id, "research", "claims.json"):
         return

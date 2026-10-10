@@ -152,6 +152,14 @@ def _fallback(p, episode_id: int, plan: dict, n: int, final: Path) -> Path:
             bg = p.slides.get(prompt, st.path(episode_id, "thumbnails", "background"), episode_id).path
         except Exception as e:
             log.warning("cover_background_failed", extra={"episode_id": episode_id, "err": str(e)[:300]})
+    if bg is None and p.stock_images:
+        # Gemini 額度用完時，用免費圖庫的實景照片當底圖
+        try:
+            r = p.stock_images.get(f"{plan['city']} {plan['landmarks'][0] if plan['landmarks'] else ''}".strip(),
+                                   st.path(episode_id, "thumbnails", "background_free"), episode_id)
+            bg = r.path if r else None
+        except Exception as e:
+            log.warning("cover_free_background_failed", extra={"episode_id": episode_id, "err": str(e)[:300]})
     out = st.path(episode_id, "thumbnails", "fallback.jpg")
     lines = plan["title_lines"] if edition.current().lang == "en" else "".join(plan["title_lines"])  # 英文不可拆單字
     cards.thumbnail(bg, lines, plan["subtitle"] or plan["city"], n, out)
@@ -173,7 +181,9 @@ def run(p, episode_id: int, feedback: str = "", force: bool = False, title: str 
         attempts_max = get_settings().cover_attempts + (2 if edition.current().lang == "en" else 0)  # 英文多給兩次機會
         for i in range(attempts_max):
             try:
-                raw = p.slides.compose(prompt, refs, st.path(episode_id, "thumbnails", f"raw_{i + 1}"), episode_id).path
+                # 中文封面保留一點額度給之後的英文封面
+                reserve = 0.3 if edition.current().lang == "zh" and get_settings().english_enabled else 0.0
+                raw = p.slides.compose(prompt, refs, st.path(episode_id, "thumbnails", f"raw_{i + 1}"), episode_id, reserve=reserve).path
                 img = _finalize(raw, st.path(episode_id, "thumbnails", f"candidate_{i + 1}.jpg"))
             except Exception as e:
                 log.warning("cover_generation_failed", extra={"episode_id": episode_id, "err": str(e)[:300]})
