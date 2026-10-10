@@ -273,6 +273,10 @@ def regenerate(p: Providers, eid: int, target: str, feedback: str = "") -> None:
         # 影片第一幀是封面，封面或標題換了就重新剪輯（場景片段會沿用）
         for area, name in (("final", "episode.mp4"), ("final", "short.mp4"), ("final", "metadata.json"), ("video", "timeline.json")):
             st.path(eid, area, name).unlink(missing_ok=True)
+        # 英文版的封面、成品與說明也重做（沿用英文旁白、投影片與配音）
+        en = english.en_root(eid) / f"ep{eid:04d}"
+        for rel in ("thumbnails/thumbnail.jpg", "final/episode.mp4", "final/short.mp4", "final/metadata.json", "video/timeline.json"):
+            (en / rel).unlink(missing_ok=True)
         restart, from_stage = S.VOICE_GENERATION, "render"
     else:
         for area in ("video", "final", "thumbnails", "subtitles"):

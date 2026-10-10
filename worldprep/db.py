@@ -66,4 +66,5 @@ def audit(s: Session, action: str, episode_id: int | None = None, actor: str = "
 
 
 def next_episode_number(s: Session) -> int:
-    return (s.scalar(select(func.max(Episode.episode_number))) or 0) + 1
+    # 只看正數集數：測試用集數歸檔時改成負數，不影響正式編號
+    return (s.scalar(select(func.max(Episode.episode_number)).where(Episode.episode_number > 0)) or 0) + 1
