@@ -4,7 +4,7 @@ from pathlib import Path
 from ..config import get_settings
 from ..logging_setup import log
 from ..render import cards
-from ..render.ffmpeg import FPS, media_duration, poster_frame, run_ffmpeg
+from ..render.ffmpeg import FPS, media_duration, run_ffmpeg
 from ..storage import get_storage
 from .subtitles import cues
 
@@ -13,6 +13,9 @@ W, H = cards.SHORTS_W, cards.SHORTS_H
 SUB_FONT_SIZE = 76
 SUB_MAX_CHARS = 12  # 直式畫面一行約可放 12 個大字
 SUB_MARGIN_BOTTOM = 400  # 落在橫式畫面下方的模糊區
+# 橫式畫面置中、上下用同一畫面的模糊放大版填滿
+VERTICAL = (f"split[a][b];[a]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=40:2,eq=brightness=-0.12[bg];"
+            f"[b]scale={W}:-2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2")
 
 
 def _ass_time(t: float) -> str:
@@ -56,10 +59,8 @@ def run(p, episode_id: int, force: bool = False) -> Path | None:
     ass = st.write_text(episode_id, "final", "short.ass", build_ass(timeline["scenes"], end))
     fade = 0.4
     graph = (
-        f"[0:v]trim=0:{end:.3f},setpts=PTS-STARTPTS,split[a][b];"
-        f"[a]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=40:2,eq=brightness=-0.12[bg];"
-        f"[b]scale={W}:-2[fg];"
-        f"[bg][fg]overlay=(W-w)/2:(H-h)/2,ass={ass.name},fps={FPS},setsar=1,format=yuv420p[v0];"
+        f"[0:v]trim=0:{end:.3f},setpts=PTS-STARTPTS,{VERTICAL}[vv];"
+        f"[vv]ass={ass.name},fps={FPS},setsar=1,format=yuv420p[v0];"
         f"[1:v]scale={W}:{H},fps={FPS},setsar=1,fade=t=in:st=0:d={fade},format=yuv420p[v1];"
         f"[2:a]atrim=0:{end:.3f},asetpts=PTS-STARTPTS,afade=t=out:st={max(0, end - fade):.3f}:d={fade}[a0];"
         f"[3:a]atrim=0:{ENDCARD_SECONDS}[a1];"
@@ -71,7 +72,8 @@ def run(p, episode_id: int, force: bool = False) -> Path | None:
                 "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
                 "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-c:a", "aac", "-b:a", "160k",
                 "-movflags", "+faststart", out.name], cwd=out.parent)
-    # Shorts 封面＝短影音的第一個畫面（第一幀有 0.05 秒淡入，取 0.1 秒避開黑畫面）
-    poster_frame(out, st.path(episode_id, "thumbnails", "short_cover.jpg"), at=0.1)
+    # Shorts 封面＝短影音的第一個畫面但不含字幕（第一幀有 0.05 秒淡入，取 0.1 秒避開黑畫面）
+    run_ffmpeg(["-ss", "0.1", "-i", str(silent.resolve()), "-frames:v", "1", "-filter_complex", f"[0:v]{VERTICAL}",
+                "-q:v", "2", str(st.path(episode_id, "thumbnails", "short_cover.jpg").resolve())])
     log.info("short_done", extra={"episode_id": episode_id, "seconds": round(media_duration(out), 1)})
     return out
