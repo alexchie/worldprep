@@ -4,7 +4,7 @@ from pathlib import Path
 from .. import edition
 from ..config import get_settings
 from ..logging_setup import log
-from ..render import cards
+from ..render import cards, motion
 from ..render.ffmpeg import FPS, media_duration, run_ffmpeg
 from ..storage import get_storage
 from .subtitles import cues
@@ -57,10 +57,11 @@ def run(p, episode_id: int, force: bool = False) -> Path | None:
     card = cards.shorts_endcard(st.path(episode_id, "thumbnails", "thumbnail.jpg"),
                                 st.path(episode_id, "thumbnails", "short_endcard.jpg"), edition.current().endcard_lines)
     ass = st.write_text(episode_id, "final", "short.ass", build_ass(timeline["scenes"], end))
+    base = st.path(episode_id, "final", "short_base.mp4")
     fade = 0.4
     graph = (
         f"[0:v]trim=0:{end:.3f},setpts=PTS-STARTPTS,{VERTICAL}[vv];"
-        f"[vv]ass={ass.name},fps={FPS},setsar=1,format=yuv420p[v0];"
+        f"[vv]fps={FPS},setsar=1,format=yuv420p[v0];"
         f"[1:v]scale={W}:{H},fps={FPS},setsar=1,fade=t=in:st=0:d={fade},format=yuv420p[v1];"
         f"[2:a]atrim=0:{end:.3f},asetpts=PTS-STARTPTS,afade=t=out:st={max(0, end - fade):.3f}:d={fade}[a0];"
         f"[3:a]atrim=0:{ENDCARD_SECONDS}[a1];"
@@ -71,7 +72,21 @@ def run(p, episode_id: int, force: bool = False) -> Path | None:
                 "-i", str(final.resolve()), "-f", "lavfi", "-t", str(ENDCARD_SECONDS), "-i", "anullsrc=r=48000:cl=stereo",
                 "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
                 "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-c:a", "aac", "-b:a", "160k",
-                "-movflags", "+faststart", out.name], cwd=out.parent)
+                "-movflags", "+faststart", base.name], cwd=out.parent)
+    # 字幕：優先用 Remotion 做跳字幕；失敗就用 FFmpeg 燒一般大字幕
+    ed = edition.current()
+    caption_cues = [(a, min(b, end), t) for a, b, t in cues([s for s in timeline["scenes"] if s["start"] < end], ed.short_sub_max)]
+    done = False
+    if motion.available():
+        try:
+            motion.render_captions(base, caption_cues, end + ENDCARD_SECONDS, out, ed.lang, SUB_MARGIN_BOTTOM)
+            done = True
+        except Exception as e:
+            log.warning("motion_captions_fallback", extra={"episode_id": episode_id, "err": str(e)[:300]})
+    if not done:
+        run_ffmpeg(["-i", base.name, "-vf", f"ass={ass.name}", "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+                    "-c:a", "copy", "-movflags", "+faststart", out.name], cwd=out.parent)
+    base.unlink(missing_ok=True)
     # Shorts 封面＝短影音的第一個畫面但不含字幕（第一幀有 0.05 秒淡入，取 0.1 秒避開黑畫面）
     run_ffmpeg(["-ss", "0.1", "-i", str(silent.resolve()), "-frames:v", "1", "-filter_complex", f"[0:v]{VERTICAL}",
                 "-q:v", "2", str(st.path(episode_id, "thumbnails", "short_cover.jpg").resolve())])

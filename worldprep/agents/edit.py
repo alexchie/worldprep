@@ -12,6 +12,7 @@ from ..config import get_settings
 from ..db import session
 from ..logging_setup import log
 from ..models import Asset, Episode
+from ..render import motion
 from ..render.ffmpeg import concat, image_clip, media_duration, run_ffmpeg, silence, video_clip
 from ..storage import get_storage
 from .subtitles import build_srt
@@ -52,6 +53,21 @@ def fit_hook(timings: dict, hook_ids: list[str], adir: Path, limit: float) -> di
     return out
 
 
+def _map_clip(m: dict, dur: float, clip: Path, fade: float, cam: str, lang: str) -> None:
+    """動態地圖（HyperFrames）；失敗就用原本 AI 生成的地圖靜態畫面。"""
+    points = [{"label": p["label_en"] if lang == "en" else p["label"], "lat": p["lat"], "lon": p["lon"]} for p in m["map"]["points"]]
+    raw = clip.with_name(f"{clip.stem}_map.mp4")
+    try:
+        motion.render_map(points, m["map"]["route"], dur, raw)
+        video_clip(raw, Path(m["overlay"]), dur, clip, fade)
+        return
+    except Exception as e:
+        log.warning("motion_map_fallback", extra={"clip": clip.name, "err": str(e)[:300]})
+    finally:
+        raw.unlink(missing_ok=True)
+    image_clip(Path(m["file_path"]), Path(m["overlay"]), dur, cam, clip, fade)
+
+
 def opening_table(timeline: list[dict], brand_at: float | None, brand_len: float, brand_line: str) -> str:
     """開場製作表（opening/opening_prompt.txt 第 7 節），用實際剪輯時間填寫。"""
     rows = ["| 時間 | 畫面 | 旁白 |", "|---|---|---|"]
@@ -86,7 +102,7 @@ def run(p, episode_id: int) -> None:
 
     video_parts, audio_parts, timeline = [], [], []
     t = 0.0
-    pending = []
+    pending, map_jobs = [], []
     brand_at = None
     for i, sc in enumerate(scenes):
         sid = sc["scene_id"]
@@ -102,7 +118,9 @@ def run(p, episode_id: int) -> None:
             # 第一幀直接承接封面主視覺（封面可能重做，所以每次重剪）
             pending.append((image_clip, (cover, None, dur, "static", clip, 0.05)))
         elif not clip.exists() or abs(media_duration(clip) - dur) > 0.15:
-            if m.get("media_type") == "video":
+            if m.get("map") and motion.available():
+                map_jobs.append((m, dur, clip, fade, sc.get("camera_motion", "static")))
+            elif m.get("media_type") == "video":
                 pending.append((video_clip, (Path(m["file_path"]), Path(m["overlay"]), dur, clip, fade)))
             else:
                 pending.append((image_clip, (Path(m["file_path"]), Path(m["overlay"]), dur, sc.get("camera_motion", "zoom_in"), clip, fade)))
@@ -122,6 +140,8 @@ def run(p, episode_id: int) -> None:
             audio_parts += [brand_wav, silence(cfg.brand_pause_seconds, adir / "pad_brand.wav")]
             t += brand_len
 
+    for m, dur, clip, fade, cam in map_jobs:  # 動態地圖一次渲染一段（HyperFrames 本身就會開多個瀏覽器）
+        _map_clip(m, dur, clip, fade, cam, ed.lang)
     with ThreadPoolExecutor(max_workers=RENDER_WORKERS) as pool:
         list(pool.map(lambda job: job[0](*job[1]), pending))
 

@@ -59,6 +59,20 @@ jobs:
       - name: System packages
         run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk ffmpeg
       - run: pip install -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: motion/package-lock.json
+      - name: Motion tools (HyperFrames + Remotion)
+        # 失敗也不擋製作：剪輯時會自動退回靜態地圖與一般字幕
+        continue-on-error: true
+        working-directory: motion
+        run: |
+          npm ci --no-audit --no-fund
+          npx hyperframes telemetry disable || true
+          npx hyperframes browser ensure
+          npx remotion browser ensure
       - name: Write Google credentials
         env:
           CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}

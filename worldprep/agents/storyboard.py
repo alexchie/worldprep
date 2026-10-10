@@ -33,6 +33,11 @@ SCENE_SCHEMA = {
                     "chart_required": {"type": "boolean"},
                     "map_place": {"type": "string"},
                     "map_caption": {"type": "string"},
+                    "map_points": {"type": "array", "items": {"type": "object", "properties": {
+                        "label": {"type": "string"}, "label_en": {"type": "string"}, "query": {"type": "string"},
+                        "lat": {"type": "number"}, "lon": {"type": "number"}},
+                        "required": ["label", "label_en", "query", "lat", "lon"], "additionalProperties": False}},
+                    "map_route": {"type": "boolean"},
                     "chart": {
                         "type": "object",
                         "properties": {
@@ -50,7 +55,7 @@ SCENE_SCHEMA = {
                 },
                 "required": ["scene_id", "visual_type", "visual_description", "shot_type", "slide_headline", "slide_number", "search_query", "ai_prompt", "realistic",
                              "camera_motion", "transition", "on_screen_text", "map_required", "chart_required",
-                             "map_place", "map_caption", "chart"],
+                             "map_place", "map_caption", "map_points", "map_route", "chart"],
                 "additionalProperties": False,
             },
         }
@@ -121,7 +126,9 @@ def run(p, episode_id: int) -> None:
         "- slide_number：只有當畫面需要強調一個關鍵數字時才填（含單位，例如「44.50%」，必須與已查核事實原文完全相同），全集最多 8 張；其餘填空字串。\n"
         "- visual_description：用英文具體描述畫面（哪個地點、時代、角度、天氣光線、構圖），時代與地點必須正確（台灣的場景不要畫成日本或中國大陸）。"
         "畫到真實的歷史人物時，只能用背影、剪影、遠景或代表物件，不可畫出可辨識的臉。"
-        "需要地圖時畫成簡化的輪廓示意，最多兩個地名，且地名必須出現在旁白中。\n"
+        "需要地圖時畫成簡化的輪廓示意，最多兩個地名，且地名必須出現在旁白中（AI 地圖只當備用，正式畫面會用真實地理資料畫成動態地圖）。\n"
+        "- map_points（只有 shot_type 為 map 時填，其餘填空陣列）：旁白提到的 1–4 個地點，依旁白順序；label 繁體中文、label_en 英文、"
+        "query 是可在地圖服務查到的英文地名（例如「Acapulco, Mexico」）、lat/lon 為十進位經緯度。map_route：旁白在講從一地移動到另一地（航線、遷徙、貿易路線）時為 true。\n"
         "- search_query：3–6 個英文關鍵字，生圖失敗時用來搜尋備用圖庫。\n"
         "其他欄位：camera_motion 一律 static；on_screen_text、ai_prompt、map_place、map_caption 填空字串；realistic、map_required、chart_required 依實際填寫；"
         "chart 不需要時填 title=''、labels=[]、values=[]、claim_id=0。\n\n"
@@ -134,7 +141,8 @@ def run(p, episode_id: int) -> None:
                                          "shot_type": "landmark", "slide_headline": sc["heading"], "slide_number": "", "search_query": "",
                                          "ai_prompt": "", "realistic": True, "camera_motion": "static", "transition": "fade",
                                          "on_screen_text": "", "map_required": False, "chart_required": False,
-                                         "map_place": "", "map_caption": "", "chart": {"title": "", "labels": [], "values": []}}
+                                         "map_place": "", "map_caption": "", "map_points": [], "map_route": False,
+                                         "chart": {"title": "", "labels": [], "values": []}}
         v = {k: val for k, val in v.items() if k != "scene_id"}
         sc.update(v)
         if sc["visual_type"] == "slide":

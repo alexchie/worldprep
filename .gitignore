@@ -10,3 +10,5 @@ music/*
 !music/library.json
 deploy/
 *.lock
+motion/node_modules/
+motion/.bin/

@@ -11,5 +11,6 @@ os.environ.update({
     "LOG_DIR": str(_tmp / "logs"),
     "TARGET_VIDEO_LENGTH_MINUTES": "1",
     "SMTP_USER": "",
+    "MOTION": "off",
 })
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

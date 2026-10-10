@@ -1,0 +1,101 @@
+<!doctype html>
+<!-- 動態地圖（HyperFrames）：真實國界與海岸線、鏡頭由區域推進到地點、地點逐一出現、路線一筆畫出。
+     __DURATION__ 與 __SPEC__ 由 worldprep/render/motion.py 在每次渲染時填入。 -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "MapLabel"; font-weight: 700;
+               src: local("Noto Sans CJK TC Bold"), local("NotoSansCJKtc-Bold"), local("Microsoft JhengHei Bold"), local("Microsoft JhengHei"); }
+  html, body { margin: 0; background: #0b1b3a; }
+  #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #0b1b3a; }
+  #map { position: absolute; inset: 0; }
+  .land { fill: #1d2f52; stroke: #3a5079; stroke-width: 0.8; }
+  .focus { fill: #27406b; stroke: #d4a853; stroke-width: 1.6; }
+  .grat { fill: none; stroke: #ffffff; stroke-opacity: 0.05; stroke-width: 1; }
+  .route { fill: none; stroke: #d4a853; stroke-width: 6; stroke-linecap: round; }
+  .label { position: absolute; transform: translate(-50%, -150%); white-space: nowrap; color: #fff; font-weight: 700;
+           font-size: 46px; font-family: "MapLabel", sans-serif;
+           text-shadow: 0 0 10px #06101f, 0 0 4px #06101f; opacity: 0; }
+  .pin { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: #d4a853;
+         box-shadow: 0 0 0 8px rgba(212, 168, 83, 0.25); opacity: 0; }
+</style>
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/topojson-client.min.js"></script>
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/world50m.js"></script>
+</head>
+<body>
+<div id="root" data-composition-id="root" data-width="1920" data-height="1080" data-start="0" data-duration="__DURATION__">
+  <svg id="map" class="clip" data-layout-allow-overflow data-start="0" data-duration="__DURATION__" width="1920" height="1080"></svg>
+</div>
+<script>
+  const SPEC = __SPEC__;
+  const W = 1920, H = 1080, D = __DURATION__;
+  const countries = topojson.feature(WORLD, WORLD.objects.countries).features;
+  const borders = topojson.mesh(WORLD, WORLD.objects.countries, (a, b) => a !== b);
+  const pts = SPEC.places.map(p => [p.lon, p.lat]);
+  const focus = countries.find(c => d3.geoContains(c, pts[0]));
+  // 跨越國際換日線的路線：把經度展開到同一側，鏡頭中心才不會跑到地球另一面
+  const lons = pts.map(p => p[0] - pts[0][0] > 180 ? p[0] - 360 : pts[0][0] - p[0] > 180 ? p[0] + 360 : p[0]);
+  const lats = pts.map(p => p[1]);
+
+  // 鏡頭：從寬範圍（區域）推進到地點範圍；half 是畫面寬度一半對應的經度
+  const box = (pad) => {
+    const cx = (Math.min(...lons) + Math.max(...lons)) / 2, cy = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const half = Math.min(170, Math.max(Math.max(...lons) - Math.min(...lons), (Math.max(...lats) - Math.min(...lats)) * 16 / 9, 1.2) / 2 * pad);
+    return { cx, cy: Math.max(-60, Math.min(60, cy)), half };
+  };
+  const wide = box(SPEC.places.length > 1 ? 2.2 : 30), tight = box(SPEC.places.length > 1 ? 1.25 : 8);
+
+  const svg = d3.select("#map");
+  const projection = d3.geoMercator();
+  const path = d3.geoPath(projection);
+  svg.append("rect").attr("width", W).attr("height", H).attr("fill", "#0b1b3a");
+  const grat = svg.append("path").datum(d3.geoGraticule10()).attr("class", "grat");
+  const land = svg.append("g").selectAll("path").data(countries).join("path")
+    .attr("class", d => d === focus ? "land focus" : "land");
+  const mesh = svg.append("path").datum(borders).attr("fill", "none").attr("stroke", "#3a5079").attr("stroke-width", 0.8);
+  const line = SPEC.route && pts.length > 1 ? { type: "LineString", coordinates: pts } : null;
+  const route = line ? svg.append("path").datum(line).attr("class", "route") : null;
+
+  const root = document.getElementById("root");
+  const markers = SPEC.places.map(p => {
+    const pin = document.createElement("div"); pin.className = "pin"; root.appendChild(pin);
+    const label = document.createElement("div"); label.className = "label"; label.textContent = p.label; root.appendChild(label);
+    return { p, pin, label };
+  });
+
+  const cam = { t: 0, draw: 0 };
+  function render() {
+    const lerp = (a, b) => a + (b - a) * cam.t;
+    const cx = lerp(wide.cx, tight.cx), cy = lerp(wide.cy, tight.cy), half = lerp(wide.half, tight.half);
+    projection.rotate([-cx, 0]).center([0, cy]).scale(W / (2 * half * Math.PI / 180)).translate([W / 2, H / 2]);
+    grat.attr("d", path); land.attr("d", path); mesh.attr("d", path);
+    if (route) {
+      route.attr("d", path);
+      const len = route.node().getTotalLength();
+      route.attr("stroke-dasharray", len).attr("stroke-dashoffset", len * (1 - cam.draw));
+    }
+    for (const m of markers) {
+      const [x, y] = projection([m.p.lon, m.p.lat]);
+      m.pin.style.left = m.label.style.left = x + "px";
+      m.pin.style.top = m.label.style.top = y + "px";
+    }
+  }
+
+  const tl = gsap.timeline({ paused: true, onUpdate: render });
+  tl.to(cam, { t: 1, duration: D * 0.5, ease: "power2.inOut", onUpdate: render }, 0);
+  markers.forEach((m, i) => {
+    const at = D * (0.35 + 0.12 * i);
+    tl.fromTo(m.pin, { opacity: 0, scale: 0.2 }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2)" }, at);
+    tl.fromTo(m.label, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.4 }, at + 0.1);
+  });
+  if (route) tl.to(cam, { draw: 1, duration: D * 0.35, ease: "power1.inOut", onUpdate: render }, D * 0.5);
+  tl.to({}, { duration: 0.01 }, D - 0.01);
+  render();
+  window.__timelines = window.__timelines || {};
+  window.__timelines["root"] = tl;
+</script>
+</body>
+</html>

@@ -9,7 +9,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       DATABASE_URL: sqlite:///data/smoke.db
       PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
@@ -23,6 +23,20 @@ jobs:
       - name: System packages
         run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk ffmpeg
       - run: pip install -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: motion/package-lock.json
+      - name: Motion tools (HyperFrames + Remotion)
+        working-directory: motion
+        run: |
+          npm ci --no-audit --no-fund
+          npx hyperframes telemetry disable || true
+          npx hyperframes browser ensure
+          npx remotion browser ensure
+      - name: Motion render check
+        run: mkdir -p data && python -m worldprep.cli motion-check
       - name: Edge TTS / Pixabay / Wikimedia from GitHub runner
         run: |
           mkdir -p data

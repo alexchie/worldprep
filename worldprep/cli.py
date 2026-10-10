@@ -193,6 +193,27 @@ def ci_email():
     typer.echo(send_daily_email(p))
 
 
+@app.command("motion-check")
+def motion_check(out_dir: str = "data/motion_check"):
+    """確認 HyperFrames（地圖動畫）與 Remotion（跳字幕）在這台機器上能輸出影片。"""
+    from pathlib import Path
+
+    from .render import motion
+    from .render.ffmpeg import probe, run_ffmpeg
+
+    out = Path(out_dir).resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    typer.echo(f"available: {motion.available()}")
+    m = motion.render_map([{"label": "東京", "lat": 35.68, "lon": 139.65}, {"label": "大阪", "lat": 34.69, "lon": 135.5}],
+                          True, 3.0, out / "map.mp4")
+    typer.echo(f"hyperframes map: {probe(m)}")
+    base = out / "base.mp4"
+    run_ffmpeg(["-f", "lavfi", "-i", "testsrc2=size=1080x1920:rate=30:duration=3", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
+                "-t", "3", "-pix_fmt", "yuv420p", "-c:a", "aac", str(base)])
+    c = motion.render_captions(base, [(0.0, 1.5, "先看懂世界"), (1.5, 3.0, "再出發 2026")], 3.0, out / "captions.mp4", "zh")
+    typer.echo(f"remotion captions: {probe(c)}")
+
+
 @app.command("upload-music")
 def upload_music_cmd(path: str):
     """把有授權的配樂上傳到 Drive（公開 repo 不放音樂檔），並記得登記到 music/library.json。"""

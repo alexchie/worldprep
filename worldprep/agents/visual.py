@@ -7,7 +7,7 @@ from ..db import session
 from ..logging_setup import log
 from ..models import Asset, Episode
 from ..providers.base import ImageResult
-from ..render import cards
+from ..render import cards, motion
 from ..render.ffmpeg import poster_frame
 from ..storage import get_storage
 
@@ -241,6 +241,11 @@ def run(p, episode_id: int, only_scenes: set[str] | None = None) -> None:
                          "attribution_required": r.attribution_required, "ai_generated": r.ai_generated,
                          "realistic": r.realistic, "asset_type": sc["visual_type"], "media_type": r.media_type,
                          "poster": str(poster)}
+        if sc.get("shot_type") == "map" and sc.get("map_points"):
+            # 動態地圖用的真實座標（剪輯時由 HyperFrames 渲染；失敗就用上面的 AI 地圖）
+            manifest[sid]["map"] = {"route": bool(sc.get("map_route")), "points": [
+                {**pt, **dict(zip(("lat", "lon"), motion.geocode(pt["query"], (pt["lat"], pt["lon"]))))}
+                for pt in sc["map_points"][:4]]}
         st.write_json(episode_id, "assets", manifest_name, manifest)
 
     with session() as s:
