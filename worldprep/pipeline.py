@@ -230,12 +230,13 @@ def produce(p: Providers, destination: str | None = None) -> int | None:
     from .config import get_settings
 
     cfg = get_settings()
-    if costs.today_total() >= cfg.daily_budget_usd:
-        raise PermanentError(f"今日支出已達預算 {cfg.daily_budget_usd} USD，停止製作，需人工確認")
     eid = active_episode()
     if eid is None and not destination and _made_tonight():
         log.info("already_produced_tonight")
         return None
+    # 預算檢查放在「確定今晚還有事要做」之後：當晚已做完時，排程的例行檢查不應因當天支出而報錯
+    if costs.today_total() >= cfg.daily_budget_usd:
+        raise PermanentError(f"今日支出已達預算 {cfg.daily_budget_usd} USD，停止製作，需人工確認")
     if eid is None and destination:
         eid = select_topic(p, destination) if cfg.mock else select_topic_from_request(p, None, destination)
     if eid is None and not cfg.mock:
