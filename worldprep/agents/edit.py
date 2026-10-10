@@ -38,7 +38,7 @@ def pick_music(episode_id: int, seconds: float) -> dict | None:
 
 def fit_hook(timings: dict, hook_ids: list[str], adir: Path, limit: float) -> dict:
     """開場 Hook 必須在 limit 秒內講完；超過時把 Hook 旁白整體加速（最多 1.25 倍），仍超過則由 QA 提醒。"""
-    total = sum(timings[s]["duration"] for s in hook_ids) + GAP * max(0, len(hook_ids) - 1) + 0.15
+    total = sum(timings[s]["duration"] for s in hook_ids) + GAP * max(0, len(hook_ids) - 1)
     if total <= limit or not hook_ids:
         return {}
     factor = min(MAX_HOOK_SPEEDUP, total / limit)
@@ -91,7 +91,7 @@ def run(p, episode_id: int) -> None:
         voice = hook_audio.get(sid) or timings[sid]
         nxt = scenes[i + 1] if i + 1 < len(scenes) else None
         last_hook = sc["section"] == "hook" and (nxt is None or nxt["section"] != "hook")
-        pad = 0.15 if last_hook else SECTION_GAP if nxt and nxt["section_start"] else GAP
+        pad = cfg.brand_pause_seconds if last_hook else SECTION_GAP if nxt and nxt["section_start"] else GAP
         dur = voice["duration"] + pad
         m = manifest[sid]
         clip = vdir / f"{sid}.mp4"
@@ -110,7 +110,7 @@ def run(p, episode_id: int) -> None:
                          "start": t, "duration": voice["duration"], "text": sc["script_text"]})
         t += dur
         if last_hook:
-            # 第 15 秒後：固定品牌圖＋品牌台詞，接著直接進正文
+            # Hook 與空白停頓之後：固定品牌圖＋品牌台詞，接著直接進正文
             brand_at = t
             brand_wav = st.path(episode_id, "audio", "brand.wav")
             brand_len = media_duration(brand_wav) + 0.2

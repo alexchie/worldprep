@@ -167,10 +167,10 @@ def brief_for(episode_id: int, role: str) -> str:
     if role == "research":
         return head + "要回答的問題：\n- " + "\n- ".join(b["research_questions"]) + "\n需要證實或推翻的細節：\n- " + "\n- ".join(b["wow_details_to_verify"])
     if role == "script":
-        return (head + f"敘事弧線：{b['narrative_arc']}\n開頭 15 秒：{b['opening_15s']}\n編劇指示：{b['script_direction']}\n"
+        return (head + f"敘事弧線：{b['narrative_arc']}\n開頭 hook：{b['opening_15s']}\n編劇指示：{b['script_direction']}\n"
                 "可能的「真的假的」細節（只能用已查核的版本）：\n- " + "\n- ".join(b["wow_details_to_verify"]))
     if role == "review":
-        return head + f"敘事弧線：{b['narrative_arc']}\n開頭 15 秒：{b['opening_15s']}"
+        return head + f"敘事弧線：{b['narrative_arc']}\n開頭 hook：{b['opening_15s']}"
     if role == "visual":
         return head + f"畫面方向：{b['visual_direction']}"
     return head

@@ -61,8 +61,8 @@ def run(p, episode_id: int) -> bool:
     srt = st.path(episode_id, "subtitles", "zh-Hant.srt")
     thumb = st.path(episode_id, "thumbnails", "thumbnail.jpg")
 
-    # Content / Writing
-    issues = [i for i in structural_issues(script, cfg.target_chars, valid_ids) if "總字數" not in i]
+    # Content / Writing（總字數與 hook 長度改由實際片長、開場時間檢查，非致命）
+    issues = [i for i in structural_issues(script, cfg.target_chars, valid_ids) if "總字數" not in i and not i.startswith("hook ")]
     _check(r, "content", "story_structure", not issues, "; ".join(issues))
     order = [x["section"] for x in script["sections"]]
     _check(r, "content", "history_city_business_culture_attractions",
@@ -120,7 +120,8 @@ def run(p, episode_id: int) -> bool:
     errs = validate_title(meta["title"], n)
     _check(r, "branding", "title_format", not errs, "; ".join(errs))
     hook_end, brand_end = timeline.get("hook_end", 0.0), timeline.get("brand_end", 0.0)
-    _check(r, "branding", "hook_within_limit", 0 < hook_end <= cfg.hook_max_seconds + 0.5, f"Hook {hook_end:.1f}s", critical=False)
+    _check(r, "branding", "hook_within_limit", cfg.hook_min_seconds - 1 <= hook_end <= cfg.hook_max_seconds + 1.5,
+           f"Hook（含停頓）{hook_end:.1f}s，規範 {cfg.hook_min_seconds:.0f}–{cfg.hook_max_seconds:.0f}s", critical=False)
     _check(r, "branding", "brand_intro", brand_end > hook_end, f"品牌 {hook_end:.1f}–{brand_end:.1f}s", critical=False)
     _check(r, "branding", "thumbnail_exists", thumb.exists() and thumb.stat().st_size < 2 * 1024 * 1024)
 

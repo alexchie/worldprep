@@ -42,7 +42,9 @@ class Settings(BaseSettings):
     cover_model: str = "gemini-3-pro-image"  # 封面字多、要求逐字正確，用 Nano Banana Pro
     cover_price_usd: float = 0.134
     cover_attempts: int = 3
-    hook_max_seconds: float = 15.0
+    hook_min_seconds: float = 15.0
+    hook_max_seconds: float = 23.0
+    brand_pause_seconds: float = 0.75  # Hook 結束後、品牌台詞前的空白
     brand_line: str = "世界先修課，跟著我們一起看懂世界再出發"  # 與正文同語速、長度不設限
 
     music_dir: Path = ROOT / "music"

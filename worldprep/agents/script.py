@@ -70,7 +70,7 @@ SCRIPT_RULES = """寫作規則：
 - 這是旁白稿，會被唸出來。口語、電影感、聰明、精簡、故事驅動。句子長短交錯，避免重複句型與明顯 AI 慣用語（例如「讓我們一起」「不僅…更是…」「在這個…的時代」「總而言之」）。
 - 敘事結構：問題 → 背景 → 歷史 → 轉變 → 商業 → 文化 → 今天看到的樣子。
 - sections 依序為 hook, geography, history, city, business, culture, attractions, closing。
-- hook：開場 15 秒內講完（字數上限見下方），依照「開場規範」：第一句直接承接本集 YouTube 標題的問題（延伸而非逐字朗讀），接著用一個真實、反直覺的事實或矛盾讓觀眾想追下去，不在 hook 裡解答。禁止問候、頻道介紹、目錄式開場。
+- hook：開場 15–23 秒講完（字數範圍見下方），依照「開場規範」：第一句直接承接本集 YouTube 標題的問題（延伸而非逐字朗讀），接著用一個真實、反直覺的事實或矛盾讓觀眾想追下去，不在 hook 裡解答。禁止問候、頻道介紹、目錄式開場。
 - hook 之後影片會自動插入固定品牌台詞，腳本裡不要寫品牌台詞；geography 段落要直接接續 hook 的謎題，不可再說「大家好」「今天我們要介紹」「本集從五個面向」之類的話。
 - 每一段都要回答「觀眾為什麼要在乎」，並用 causal_link 說明它如何承接上一段、推動下一段。
 - culture 不是獨立段落，要連回歷史、城市、商業。
@@ -98,11 +98,16 @@ def hook_char_limit() -> int:
     return int((cfg.hook_max_seconds - 1.0) * cfg.effective_chars_per_minute / 60)
 
 
+def hook_char_min() -> int:
+    cfg = get_settings()
+    return int((cfg.hook_min_seconds - 1.0) * cfg.effective_chars_per_minute / 60)
+
+
 def structural_issues(script: dict, target_chars: int, valid_ids: set[int]) -> list[str]:
     issues = []
     hook = sum(len(par["text"]) for sec in script["sections"] if sec["section"] == "hook" for par in sec["paragraphs"])
-    if hook > hook_char_limit():
-        issues.append(f"hook {hook} 字，超過 15 秒上限約 {hook_char_limit()} 字")
+    if not hook_char_min() <= hook <= hook_char_limit():
+        issues.append(f"hook {hook} 字，應在 {hook_char_min()}–{hook_char_limit()} 字之間（15–23 秒）")
     order = [s["section"] for s in script["sections"]]
     filtered = [s for s in SECTION_ORDER if s in order]
     if order != filtered or any(x not in order for x in ["hook", "history", "city", "business", "culture", "attractions"]):
@@ -133,7 +138,7 @@ def run(p, episode_id: int, feedback: str = "") -> None:
     valid = {f["id"] for f in facts}
     notes = st.path(episode_id, "research", "notes.md").read_text(encoding="utf-8")
     opening = OPENING_RULES.read_text(encoding="utf-8") if OPENING_RULES.exists() else ""
-    system = (f"{EDITORIAL_DNA}\n\n你是頻道首席紀錄片編劇。\n{SCRIPT_RULES}\n- hook 全段最多 {hook_char_limit()} 字。"
+    system = (f"{EDITORIAL_DNA}\n\n你是頻道首席紀錄片編劇。\n{SCRIPT_RULES}\n- hook 全段 {hook_char_min()}–{hook_char_limit()} 字。"
               f"\n\n## 開場規範（頻道主提供；畫面、品牌動畫與剪輯由系統處理，你只負責 hook 旁白）\n{opening}")
     base = (
         f"目的地：{dest}\n本集核心問題：{angle}\n{brief_for(episode_id, 'script')}\n\n旁白總字數目標：約 {target} 字（依實測語速換算的 {get_settings().target_video_length_minutes} 分鐘）。\n\n"
@@ -151,7 +156,7 @@ def run(p, episode_id: int, feedback: str = "") -> None:
             f"{EDITORIAL_DNA}\n\n你是嚴格的總編輯，負責腳本審查。",
             "審查以下旁白稿：故事是否連貫？是否遵循 歷史→城市→商業→文化→景點 的因果鏈？hook 是否夠強？"
             "是否有未被已查核事實支持的主張（列出原句）？是否是自然的台灣繁體中文、不學術、不像 AI 寫的？有無不必要的重複？"
-            "腳本是否走製作人指定的敘事弧線、開頭 15 秒是否做到要求？"
+            "腳本是否走製作人指定的敘事弧線、開頭 hook 是否做到要求？"
             "title_supported：標題的每個承諾（數字、情緒詞、因果）是否都被已查核事實與腳本兌現；若否，title_fix 寫一個符合同一原型、"
             "只承諾已兌現內容的修正版主標題（30 字以內，不含「｜世界先修課 EP.xx」），若是則留空字串。"
             "score 0-10，>=7.5 且無未支持主張才 pass。\n\n"
