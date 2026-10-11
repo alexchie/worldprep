@@ -76,6 +76,8 @@ def resolve(p, text: str) -> tuple[str, str]:
 
     r = parse_reply(p, text, options)
     topic = r["custom_topic"].strip()
+    if topic and r["custom_is_full_title"]:
+        topic = f"{topic}\n指定標題：{topic}"  # 頻道主寫的是完整標題：照原句使用
     if not topic and options and 1 <= r["option_number"] <= len(options):
         o = options[r["option_number"] - 1]
         topic = f"{o['city']}：{o['angle']}\n指定標題：{o['main_title']}"
@@ -128,8 +130,10 @@ def fetch_requests(p=None) -> int:
 
 
 def next_request() -> TopicRequest | None:
+    """每天只做一集：以最新一封回信的主題為準（較舊、沒用到的回信在建立集數時一併作廢）。"""
     with session() as s:
-        return s.scalar(select(TopicRequest).where(TopicRequest.used_episode_id.is_(None)).order_by(TopicRequest.received_at))
+        return s.scalar(select(TopicRequest).where(TopicRequest.used_episode_id.is_(None))
+                        .order_by(TopicRequest.received_at.desc()))
 
 
 def pending_count() -> int:

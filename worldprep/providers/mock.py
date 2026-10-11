@@ -126,7 +126,7 @@ class MockLLM:
         if task == "topic_options":
             return {"options": [{"main_title": f"香港選項{i}", "angle": "mock", "why_click": "mock", "archetype": "A"} for i in (1, 2, 3)]}
         if task == "reply_parse":
-            return {"option_number": 2, "custom_topic": "", "next_city": "首爾"}
+            return {"option_number": 2, "custom_topic": "", "custom_is_full_title": False, "next_city": "首爾"}
         if task == "title_judge":
             picks = re.findall(r"^- \[([A-G])\] (.+)$", prompt, re.M)[:3]
             return {"picks": [{"main_title": t, "archetype": a, "reason": "mock"} for a, t in picks]}

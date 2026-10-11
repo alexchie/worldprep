@@ -185,9 +185,10 @@ REPLY_SCHEMA = {
     "properties": {
         "option_number": {"type": "integer"},
         "custom_topic": {"type": "string"},
+        "custom_is_full_title": {"type": "boolean"},
         "next_city": {"type": "string"},
     },
-    "required": ["option_number", "custom_topic", "next_city"],
+    "required": ["option_number", "custom_topic", "custom_is_full_title", "next_city"],
     "additionalProperties": False,
 }
 
@@ -201,6 +202,7 @@ def parse_reply(p, text: str, options: list[dict] | None) -> dict:
         "option_number：頻道主選了第幾個選項（1–3）；沒有選選項時填 0。\n"
         "custom_topic：頻道主自己寫的明天主題或標題（含城市），原文照抄；選了選項而且沒有另外改寫時填空字串。"
         "頻道主是選了某個選項再補充修改時，填上修改後的完整說法。\n"
+        "custom_is_full_title：custom_topic 是一句可以直接當影片標題的完整標題（例如問句標題）時填 true；只是城市、方向或描述時填 false。\n"
         "next_city：頻道主說後天（下一個）想做的城市或地區；沒提到時填空字串。",
         REPLY_SCHEMA,
     )
@@ -305,7 +307,12 @@ def _create(brief: dict, request: str | None, request_id: int | None) -> int:
         s.flush()
         topic.used_episode_id, topic.used_at = ep.id, datetime.now(timezone.utc)
         if request_id is not None:
-            s.get(TopicRequest, request_id).used_episode_id = ep.id
+            req = s.get(TopicRequest, request_id)
+            req.used_episode_id = ep.id
+            # 較舊、還沒用到的回信已被這封取代
+            for old in s.scalars(select(TopicRequest).where(TopicRequest.used_episode_id.is_(None),
+                                                             TopicRequest.received_at < req.received_at)):
+                old.used_episode_id = ep.id
         audit(s, "episode_planned", ep.id, request=request, destination=brief["destination"],
               question=brief["core_question"], title=ep.title)
         eid = ep.id
