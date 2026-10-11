@@ -62,7 +62,7 @@ def run(p, episode_id: int) -> bool:
     thumb = st.path(episode_id, "thumbnails", "thumbnail.jpg")
 
     # Content / Writing（總字數與 hook 長度改由實際片長、開場時間檢查，非致命）
-    issues = [i for i in structural_issues(script, cfg.target_chars, valid_ids) if "總字數" not in i and not i.startswith("hook ")]
+    issues = [i for i in structural_issues(script, cfg.target_chars, valid_ids) if "總字數" not in i and not i.startswith(("hook ", "大綱"))]
     _check(r, "content", "story_structure", not issues, "; ".join(issues))
     order = [x["section"] for x in script["sections"]]
     _check(r, "content", "section_order", [x for x in SECTION_ORDER if x in order] == order and "hook" in order, critical=False)

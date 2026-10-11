@@ -21,7 +21,7 @@ def run(p, episode_id: int) -> None:
         t = timings.get(sid)
         if t and Path(t["file"]).exists() and t["text"] == sc["script_text"]:
             continue
-        r = tts.synthesize(sc["script_text"], st.path(episode_id, "audio", sid), episode_id)
+        r = tts.synthesize(sc["script_text"], st.path(episode_id, "audio", sid), episode_id, rate=pace(sc["script_text"]))
         timings[sid] = {"file": str(r.path), "duration": r.duration, "chars": r.chars, "text": sc["script_text"]}
         st.write_json(episode_id, "audio", name, timings)
     if not st.exists(episode_id, "audio", "brand.wav"):
@@ -29,6 +29,14 @@ def run(p, episode_id: int) -> None:
         tts.synthesize(ed.brand_line, st.path(episode_id, "audio", "brand"), episode_id)
     if tts.name != "mock" and ed.lang == "zh":  # 語速校正只用中文
         calibrate(timings)
+
+
+def pace(text: str) -> str:
+    """免費版的語氣變化：問句與短促的關鍵句放慢一點，其餘維持原本語速。"""
+    t = text.strip()
+    if t.endswith(("？", "?")) or len(t) <= 12:
+        return "-9%"
+    return "-3%"
 
 
 def calibrate(timings: dict) -> None:

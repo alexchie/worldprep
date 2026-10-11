@@ -73,8 +73,10 @@ MOTIONS = {
 }
 
 
-def image_clip(image: Path, overlay: Path | None, seconds: float, motion: str, out: Path, fade: float = 0.35) -> Path:
+def image_clip(image: Path, overlay: Path | None, seconds: float, motion: str, out: Path, fade: float = 0.35,
+               fade_in: float | None = None, fade_out: float | None = None) -> Path:
     n = max(1, int(round(seconds * FPS)))
+    fi, fo = fade if fade_in is None else fade_in, fade if fade_out is None else fade_out
     z, x, y = MOTIONS.get(motion, MOTIONS["zoom_in"])
     x, y = x.format(n=n), y.format(n=n)
     vf = (f"[0:v]scale={W * 3 // 2}:{H * 3 // 2}:force_original_aspect_ratio=increase,crop={W * 3 // 2}:{H * 3 // 2},"
@@ -85,10 +87,47 @@ def image_clip(image: Path, overlay: Path | None, seconds: float, motion: str, o
         vf += ";[bg][1:v]overlay=0:0:shortest=1[v0]"
     else:
         vf += ";[bg]null[v0]"
-    vf += f";[v0]fade=t=in:st=0:d={fade},fade=t=out:st={max(0, seconds - fade):.3f}:d={fade},format=yuv420p[v]"
+    fades = ([f"fade=t=in:st=0:d={fi}"] if fi > 0 else []) + ([f"fade=t=out:st={max(0, seconds - fo):.3f}:d={fo}"] if fo > 0 else [])
+    vf += f";[v0]{','.join([*fades, 'format=yuv420p'])}[v]"
     args += ["-filter_complex", vf, "-map", "[v]", "-frames:v", str(n), "-r", str(FPS),
              "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-an", str(out)]
     run_ffmpeg(args)
+    return out
+
+
+# 特寫取景：畫面中最有看頭的區域（由投影片審核時標出），放大 1.35 倍
+FOCUS = {"center": (0.5, 0.5), "left": (0.0, 0.5), "right": (1.0, 0.5), "top": (0.5, 0.0), "bottom": (0.5, 1.0),
+         "top_left": (0.0, 0.0), "top_right": (1.0, 0.0), "bottom_left": (0.0, 1.0), "bottom_right": (1.0, 1.0)}
+CLOSEUP_ZOOM = 1.35
+SPLIT_MIN_SECONDS = 4.5
+
+
+def closeup_image(image: Path, focus: str, out: Path) -> Path:
+    from PIL import Image
+
+    im = Image.open(image).convert("RGB")
+    s = max(W / im.width, H / im.height)
+    im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+    cw, ch = round(W / CLOSEUP_ZOOM), round(H / CLOSEUP_ZOOM)
+    fx, fy = FOCUS.get(focus, FOCUS["center"])
+    left, top = round((im.width - cw) * fx), round((im.height - ch) * fy)
+    im.crop((left, top, left + cw, top + ch)).resize((W, H), Image.LANCZOS).save(out, quality=95)
+    return out
+
+
+def split_clip(image: Path, overlay: Path | None, seconds: float, focus: str, out: Path, fade: float = 0.35) -> Path:
+    """同一張圖切成兩個鏡頭：先全景、再硬切到局部特寫。畫面完全不晃動，只靠剪接製造節奏。"""
+    if seconds < SPLIT_MIN_SECONDS:
+        return image_clip(image, overlay, seconds, "static", out, fade)
+    n = max(2, int(round(seconds * FPS)))
+    n1 = int(round(n * 0.55))
+    wide, close = out.with_name(f"{out.stem}_a.mp4"), out.with_name(f"{out.stem}_b.mp4")
+    zoomed = closeup_image(image, focus, out.with_name(f"{out.stem}_close.jpg"))
+    image_clip(image, overlay, n1 / FPS, "static", wide, fade, fade_out=0)
+    image_clip(zoomed, overlay, (n - n1) / FPS, "static", close, fade, fade_in=0)
+    concat([wide, close], out)
+    for f in (wide, close, zoomed, out.with_suffix(".txt")):
+        f.unlink(missing_ok=True)
     return out
 
 

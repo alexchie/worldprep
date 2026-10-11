@@ -10,12 +10,13 @@ from .topic import brief_for, read_brief, set_title
 
 OPENING_RULES = ROOT / "opening" / "opening_prompt.txt"
 
-SECTION_ORDER = ["hook", "geography", "history", "city", "business", "culture", "attractions", "closing"]
+SECTION_ORDER = ["hook", "outline", "geography", "history", "city", "business", "culture", "attractions", "closing"]
 
 SCRIPT_SCHEMA = {
     "type": "object",
     "properties": {
         "thesis": {"type": "string"},
+        "outline_points": {"type": "array", "items": {"type": "string"}},
         "sections": {
             "type": "array",
             "items": {
@@ -42,7 +43,7 @@ SCRIPT_SCHEMA = {
             },
         },
     },
-    "required": ["thesis", "sections"],
+    "required": ["thesis", "outline_points", "sections"],
     "additionalProperties": False,
 }
 
@@ -71,9 +72,12 @@ REVIEW_SCHEMA = {
 SCRIPT_RULES = """寫作規則：
 - 這是旁白稿，會被唸出來。口語、電影感、聰明、精簡、故事驅動。句子長短交錯，避免重複句型與明顯 AI 慣用語（例如「讓我們一起」「不僅…更是…」「在這個…的時代」「總而言之」）。
 - 這是 5–7 分鐘的短片，只講一個有趣的故事：一條主線、幾個讓人驚呼的細節，不要面面俱到、不要講太深。
-- sections 從 hook, geography, history, city, business, culture, attractions, closing 中挑故事需要的使用（順序不變），一定要有 hook 與 closing，其餘只在故事需要時才寫；寧可少段落也不要每段都蜻蜓點水。
+- sections 從 hook, outline, geography, history, city, business, culture, attractions, closing 中挑故事需要的使用（順序不變），一定要有 hook、outline 與 closing，其餘只在故事需要時才寫；寧可少段落也不要每段都蜻蜓點水。
 - hook：開場 15–23 秒講完（字數範圍見下方），依照「開場規範」：第一句直接承接本集 YouTube 標題的問題（延伸而非逐字朗讀），接著用一個真實、反直覺的事實或矛盾讓觀眾想追下去，不在 hook 裡解答。禁止問候、頻道介紹、目錄式開場。
-- hook 之後影片會自動插入固定品牌台詞，腳本裡不要寫品牌台詞；geography 段落要直接接續 hook 的謎題，不可再說「大家好」「今天我們要介紹」「本集從五個面向」之類的話。
+- hook 之後影片會自動插入固定品牌台詞，腳本裡不要寫品牌台詞。
+- outline（本集大綱，緊接在品牌台詞之後、正文之前）：只有一個段落、40–80 字，用口語告訴觀眾接下來會依序看哪幾件事、為什麼要看，讓觀眾知道每段在幹嘛（例如「要回答這個問題，我們分三步來看：先看……，再看……，最後看……。」）。不揭曉 hook 的答案、不說「大家好」「歡迎收看」。
+  outline_points：大綱的 3–4 個重點，依正文順序，各 4–12 字、像目錄標題（例如「天皇搬走的那一年」「織工的生存之道」），會以文字顯示在畫面上，必須和 outline 旁白講的一致、也和後面正文的段落順序一致。
+- outline 之後的第一段直接進入故事，不再重複大綱。
 - 觀眾對這個地方幾乎一無所知：
   · geography 段落開頭先用 2–3 句幫觀眾定位：在世界的哪一區、靠什麼海或鄰近哪些國家、是哪個國家的哪種城市、主要說什麼語言。不要拿特定國家（包括台灣）比距離或大小。
   · 每個地名、人名、事件第一次出現時，用一句白話說明它是什麼、在哪裡、是誰（例如「西班牙——當年歐洲最強的海上帝國之一——」）。
@@ -92,7 +96,8 @@ SCRIPT_RULES = """寫作規則：
 - 結尾要回到旅人今天能親眼看到的地方：不要說「這裡很漂亮」，要說「知道了這個故事，你再去看，就會發現……」。
 - closing 用一兩句收束核心問題，自然帶出「先看懂世界，再出發。」，不要喊口號式結尾、不要求訂閱。
 - 只能使用提供的已查核事實中的數字、日期、排名與公司資訊；每段在 claim_ids 標註用到的事實編號。沒有查核過的具體數字一律不要寫。
-- 段落長度約 60–140 字，方便配畫面。"""
+- 段落長度約 60–140 字，方便配畫面。
+- 旁白由 AI 語音唸出，節奏要寫在文字裡：揭曉答案或轉折之前，先用一個短問句或句號把話停住，再用「但」「沒想到」「其實」「結果」開頭的新句子接上；關鍵句獨立成短句；長句後面接短句，不要連續三句長度差不多。"""
 
 
 def _facts(episode_id: int) -> tuple[list[dict], str]:
@@ -135,6 +140,12 @@ def structural_issues(script: dict, target_chars: int, valid_ids: set[int]) -> l
     n = len(text.replace("\n", ""))
     if abs(n - target_chars) / target_chars > 0.15:
         issues.append(f"總字數 {n}，目標約 {target_chars}（±15%）")
+    outline = [sec for sec in script["sections"] if sec["section"] == "outline"]
+    if not outline:
+        issues.append("大綱：缺少 outline 段落（品牌台詞之後、正文之前）")
+    points = script.get("outline_points", [])
+    if not 3 <= len(points) <= 4 or any(not 2 <= len(x) <= 14 for x in points):
+        issues.append(f"大綱：outline_points 應為 3–4 個、各 4–12 字：{points}")
     bad = {cid for sec in script["sections"] for p in sec["paragraphs"] for cid in p["claim_ids"]} - valid_ids
     if bad:
         issues.append(f"引用了未查核的事實編號：{sorted(bad)}")

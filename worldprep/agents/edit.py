@@ -13,7 +13,7 @@ from ..db import session
 from ..logging_setup import log
 from ..models import Asset, Episode
 from ..render import motion
-from ..render.ffmpeg import concat, image_clip, media_duration, run_ffmpeg, silence, video_clip
+from ..render.ffmpeg import concat, image_clip, media_duration, run_ffmpeg, silence, split_clip, video_clip
 from ..storage import get_storage
 from .subtitles import build_srt
 
@@ -22,6 +22,10 @@ SECTION_GAP = 0.9
 BURN_SUBTITLES = True
 RENDER_WORKERS = max(1, (os.cpu_count() or 2) // 2)
 MAX_HOOK_SPEEDUP = 1.25
+# 免費版的配音節奏：問句、懸念之後多停一下；轉折詞開頭的句子前也停一下，讓重點有呼吸
+BEAT_GAP = 0.75
+TURN_WORDS = ("但", "可是", "沒想到", "其實", "結果", "然而", "偏偏", "直到", "原來", "問題是")
+SUSPENSE_ENDINGS = ("？", "?", "……", "——", "…")
 SRT_NAME = {"zh": "zh-Hant.srt", "en": "en.srt"}
 
 
@@ -110,6 +114,9 @@ def run(p, episode_id: int) -> None:
         nxt = scenes[i + 1] if i + 1 < len(scenes) else None
         last_hook = sc["section"] == "hook" and (nxt is None or nxt["section"] != "hook")
         pad = cfg.brand_pause_seconds if last_hook else SECTION_GAP if nxt and nxt["section_start"] else GAP
+        if sc["section"] != "hook" and nxt and pad < BEAT_GAP and (
+                sc["script_text"].rstrip().endswith(SUSPENSE_ENDINGS) or nxt["script_text"].lstrip().startswith(TURN_WORDS)):
+            pad = BEAT_GAP
         dur = voice["duration"] + pad
         m = manifest[sid]
         clip = vdir / f"{sid}.mp4"
@@ -122,6 +129,9 @@ def run(p, episode_id: int) -> None:
                 map_jobs.append((m, dur, clip, fade, sc.get("camera_motion", "static")))
             elif m.get("media_type") == "video" and Path(m["file_path"]).exists():
                 pending.append((video_clip, (Path(m["file_path"]), Path(m["overlay"]), dur, clip, fade)))
+            elif m.get("media_type") != "video" and not m["source"].startswith("original"):
+                # 照片／投影片：同一張圖切成「全景 → 局部特寫」兩個鏡頭（不晃動）
+                pending.append((split_clip, (Path(m["file_path"]), Path(m["overlay"]), dur, m.get("focus", "center"), clip, fade)))
             else:
                 # 已交付集數的雲端存檔不含影片素材，重做時改用它的定格畫面
                 src = Path(m["file_path"]) if m.get("media_type") != "video" else Path(m.get("poster") or m["file_path"])

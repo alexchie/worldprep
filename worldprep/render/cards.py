@@ -126,24 +126,50 @@ def chart(data: dict, out: Path) -> Path:
 
 
 def text_overlay(text: str, out: Path, watermark: bool = True) -> Path:
-    """透明疊加層：左下字卡 + 右上浮水印。"""
+    """透明疊加層：左上重點大字（關鍵時刻的關鍵詞或數字，避開下方字幕）+ 右上浮水印。"""
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     if text:
-        f = _font(54)
-        lines = _wrap(text, f, 1100)[:2]
-        box_h = 60 + 72 * len(lines)
-        y0 = H - 140 - box_h
-        width = int(max(f.getlength(line) for line in lines)) + 110
-        d.rectangle([90, y0, 90 + width, y0 + box_h], fill=NAVY_DEEP + (205,))
-        d.rectangle([90, y0, 100, y0 + box_h], fill=GOLD + (255,))
+        f = _font(104)
+        lines = _wrap(text, f, 1150)[:2]
+        line_h = 128
+        box_h = 56 + line_h * len(lines)
+        x0, y0 = 90, 90
+        width = int(max(f.getlength(line) for line in lines)) + 120
+        d.rectangle([x0, y0, x0 + width, y0 + box_h], fill=NAVY_DEEP + (215,))
+        d.rectangle([x0, y0, x0 + 14, y0 + box_h], fill=GOLD + (255,))
         for i, line in enumerate(lines):
-            d.text((140, y0 + 30 + i * 72), line, font=f, fill=WHITE)
+            d.text((x0 + 62, y0 + 22 + i * line_h), line, font=f, fill=GOLD if i == 0 else WHITE)
     if watermark:
         wm = mark(84)
         wm.putalpha(wm.getchannel("A").point(lambda a: int(a * 0.55)))
         img.alpha_composite(wm, (W - wm.width - 44, 44))
     img.save(out)
+    return out
+
+
+def outline_card(heading: str, points: list[str], out: Path) -> Path:
+    """本集大綱：觀眾在聽大綱旁白時，同時看到條列的重點。"""
+    img = _gradient()
+    d = ImageDraw.Draw(img)
+    d.text((160, 150), heading or ("In this episode" if edition.current().lang == "en" else "本集大綱"), font=_font(56), fill=GOLD)
+    d.line([(160, 240), (300, 240)], fill=GOLD, width=6)
+    points = points[:4]
+    f = _font(76 if len(points) <= 3 else 68)
+    step = 170 if len(points) <= 3 else 150
+    y = 300 + (4 - len(points)) * 30
+    for i, pt in enumerate(points, 1):
+        d.ellipse([160, y + 4, 240, y + 84], fill=GOLD)
+        num = str(i)
+        nf = _font(52)
+        d.text((200 - nf.getlength(num) / 2, y + 12), num, font=nf, fill=NAVY_DEEP)
+        d.text((290, y), _wrap(pt, f, W - 450)[0], font=f, fill=WHITE)
+        y += step
+    wm = mark(84)
+    wm.putalpha(wm.getchannel("A").point(lambda a: int(a * 0.55)))
+    img = img.convert("RGBA")
+    img.alpha_composite(wm, (W - wm.width - 44, 44))
+    img.convert("RGB").save(out, quality=95)
     return out
 
 

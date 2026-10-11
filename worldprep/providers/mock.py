@@ -20,6 +20,7 @@ CLAIMS = [
 
 SCRIPT = [
     ("hook", "開場", ["如果我告訴你，今天的東京，其實是從一場幾乎摧毀整座城市的災難之後重新長出來的，你會相信嗎？"]),
+    ("outline", "這集要看的三件事", ["要回答這個問題，我們分三步來看：先看江戶怎麼變成東京，再看地震後的重建，最後看今天的東京。"]),
     ("geography", "一片平原與一個海灣", ["東京站在關東平原上，面對東京灣。平坦的土地讓城市可以一直往外長，海灣則把它和整個世界連在一起。"]),
     ("history", "從江戶到東京", ["一六〇三年，德川家康在江戶開設幕府，這個小漁村開始變成權力中心。", "一八六八年明治維新之後，江戶改名東京，正式成為日本的首都。"]),
     ("city", "一座被鐵道定義的城市", ["一九二三年的關東大地震幾乎讓東京歸零，重建時，鐵道成了城市的骨架。山手線把新宿、澀谷、池袋這些副都心串在一起。"]),
@@ -55,6 +56,7 @@ class MockLLM:
                                 for i in ids]}
         if task in ("script", "script_revise"):
             return {"thesis": "東京是一座在災難與重建中不斷重新定義自己的城市。",
+                    "outline_points": ["從江戶到東京", "地震後的重建", "今天的東京"],
                     "sections": [{"section": sec, "heading": h, "causal_link": "",
                                   "paragraphs": [{"text": t, "claim_ids": ids[:1]} for t in paras]} for sec, h, paras in SCRIPT]}
         if task == "script_review":
@@ -64,7 +66,7 @@ class MockLLM:
                     "score": 8.5}
         if task == "storyboard":
             sids = re.findall(r"^(s\d{3}) ", prompt, re.M)
-            cycle = ["slide", "slide", "chart", "slide"]
+            cycle = ["slide", "stock_video", "chart", "slide"]
             out = []
             for i, sid in enumerate(sids):
                 vt = cycle[i % len(cycle)]

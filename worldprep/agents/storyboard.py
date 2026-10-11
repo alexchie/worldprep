@@ -4,7 +4,7 @@ from ..storage import get_storage
 from .prompts import EDITORIAL_DNA
 from .topic import brief_for
 
-VISUAL_TYPES = ["slide", "chart", "title_card"]
+VISUAL_TYPES = ["slide", "stock_video", "chart", "title_card"]
 SHOT_TYPES = ["people", "object", "map", "then_now", "daily_life", "landmark"]
 MOTIONS = ["zoom_in", "zoom_out", "pan_left", "pan_right", "static"]
 MAX_SCENE_CHARS = 45
@@ -83,7 +83,9 @@ def base_scenes(script: dict) -> list[dict]:
     scenes = []
     for si, sec in enumerate(script["sections"]):
         for pi, para in enumerate(sec["paragraphs"]):
-            for ci, chunk in enumerate(split_scenes(para["text"])):
+            # 大綱整段一個畫面（文字大綱卡），不切場景
+            chunks = [para["text"]] if sec["section"] == "outline" else split_scenes(para["text"])
+            for ci, chunk in enumerate(chunks):
                 scenes.append({
                     "scene_id": f"s{len(scenes) + 1:03d}",
                     "section": sec["section"],
@@ -104,10 +106,13 @@ def run(p, episode_id: int) -> None:
     from .script import _facts
 
     _, fact_text = _facts(episode_id)
-    listing = "\n".join(f"{s['scene_id']} [{s['section']}] {s['script_text']}" for s in scenes)
+    # 大綱段落固定用文字大綱卡，不需要分鏡設計
+    listing = "\n".join(f"{s['scene_id']} [{s['section']}] {s['script_text']}" for s in scenes if s["section"] != "outline")
     prompt = (
         "為下列每個場景設計一張投影片式畫面（每個 scene_id 恰好一筆，順序相同）。畫面由 AI 生圖產生，電影感、寫實或老照片質感。\n"
-        "visual_type：預設 slide；需要比較多個數字（人口、GDP、產業占比、成長）時用 chart（全集最多 6 個；數字只能取自下方已查核事實，"
+        "visual_type：預設 slide；講到今天看得到的日常或街景（shot_type 為 daily_life 或 landmark、而且是現代畫面）時，可改用 stock_video（免費實拍影片，"
+        "全集約 15–25%，hook 段落不用，不可連續兩個）：search_query 要寫成圖庫搜得到的英文實拍關鍵字，一定含城市名（例如「Kyoto Gion street walking」），"
+        "找不到合適影片時系統會自動改做 slide，所以 slide 的欄位照樣要填；需要比較多個數字（人口、GDP、產業占比、成長）時用 chart（全集最多 6 個；數字只能取自下方已查核事實，"
         "values 必須與事實原文完全相同、不可換算，萬/億等單位寫在 unit，並填 claim_id 與 source）；title_card 不要使用。\n"
         "slide 的欄位：\n"
         "- 畫面必須畫出這句旁白裡的具體名詞或動作：沒聽到旁白的人，看畫面也要大概猜得到在講什麼。不要用和旁白無關的漂亮風景帶過。\n"
@@ -130,13 +135,24 @@ def run(p, episode_id: int) -> None:
         "- map_points（只有 shot_type 為 map 時填，其餘填空陣列）：旁白提到的 1–4 個地點，依旁白順序；label 繁體中文、label_en 英文、"
         "query 是可在地圖服務查到的英文地名（例如「Acapulco, Mexico」）、lat/lon 為十進位經緯度。map_route：旁白在講從一地移動到另一地（航線、遷徙、貿易路線）時為 true。\n"
         "- search_query：3–6 個英文關鍵字，生圖失敗時用來搜尋備用圖庫。\n"
-        "其他欄位：camera_motion 一律 static；on_screen_text、ai_prompt、map_place、map_caption 填空字串；realistic、map_required、chart_required 依實際填寫；"
+        "- on_screen_text（重點大字）：只在故事的關鍵時刻填——轉折、揭曉答案、讓人驚呼的數字——內容是 2–10 字的關鍵詞或數字，"
+        "必須是這句旁白裡講到的字（數字須與已查核事實原文相同），會以大字疊在畫面左上角；全集 5–8 個、彼此不重複，其餘填空字串。"
+        "提到兩地之間的移動、距離或相對位置時，優先用 map。\n"
+        "其他欄位：camera_motion 一律 static；ai_prompt、map_place、map_caption 填空字串；realistic、map_required、chart_required 依實際填寫；"
         "chart 不需要時填 title=''、labels=[]、values=[]、claim_id=0。\n\n"
         f"## 已查核事實\n{fact_text}\n\n{brief_for(episode_id, 'visual')}\n\n## 場景\n{listing}"
     )
     data = p.llm.json("storyboard", f"{EDITORIAL_DNA}\n\n你是紀錄片分鏡導演與剪輯師。", prompt, SCENE_SCHEMA, episode_id, effort="medium")
     by_id = {x["scene_id"]: x for x in data["scenes"]}
     for sc in scenes:
+        if sc["section"] == "outline":
+            sc.update({"visual_type": "outline", "outline_points": script.get("outline_points", []), "shot_type": "outline",
+                       "visual_description": "", "slide_headline": "", "slide_number": "", "search_query": "", "ai_prompt": "",
+                       "realistic": False, "camera_motion": "static", "transition": "fade", "on_screen_text": "",
+                       "map_required": False, "chart_required": False, "map_place": "", "map_caption": "", "map_points": [],
+                       "map_route": False, "chart": {"title": "", "labels": [], "values": []},
+                       "source_type": "outline", "source_reference": "", "duration": None})
+            continue
         v = by_id.get(sc["scene_id"]) or {"visual_type": "slide", "visual_description": sc["script_text"],
                                          "shot_type": "landmark", "slide_headline": sc["heading"], "slide_number": "", "search_query": "",
                                          "ai_prompt": "", "realistic": True, "camera_motion": "static", "transition": "fade",
@@ -145,9 +161,8 @@ def run(p, episode_id: int) -> None:
                                          "chart": {"title": "", "labels": [], "values": []}}
         v = {k: val for k, val in v.items() if k != "scene_id"}
         sc.update(v)
-        if sc["visual_type"] == "slide":
-            # 投影片不晃動；大標已畫在圖上，不再疊字卡
-            sc["camera_motion"], sc["on_screen_text"] = "static", ""
+        if sc["visual_type"] in ("slide", "stock_video"):
+            sc["camera_motion"] = "static"  # 不晃動；節奏靠「全景 → 特寫」切換
         sc["source_type"] = sc["visual_type"]
         sc["source_reference"] = ""
         sc["duration"] = None

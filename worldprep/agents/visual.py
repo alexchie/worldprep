@@ -8,7 +8,7 @@ from ..logging_setup import log
 from ..models import Asset, Episode
 from ..providers.base import ImageResult
 from ..render import cards, motion
-from ..render.ffmpeg import poster_frame
+from ..render.ffmpeg import FOCUS, poster_frame
 from ..storage import get_storage
 
 
@@ -99,10 +99,11 @@ SLIDE_CHECK_SCHEMA = {
                     "recognizable_real_person_face": {"type": "boolean"},
                     "wrong_place_or_era": {"type": "boolean"},
                     "shows_narration": {"type": "boolean"},
+                    "detail_area": {"type": "string", "enum": list(FOCUS)},
                     "note": {"type": "string"},
                 },
                 "required": ["index", "headline_correct", "number_correct", "extra_or_garbled_text",
-                             "recognizable_real_person_face", "wrong_place_or_era", "shows_narration", "note"],
+                             "recognizable_real_person_face", "wrong_place_or_era", "shows_narration", "detail_area", "note"],
                 "additionalProperties": False,
             },
         }
@@ -122,8 +123,10 @@ def letterboxed(path: Path) -> bool:
     return row(1) < 8 and row(34) < 8
 
 
-def check_slides(p, scenes: dict[str, dict], slides: dict[str, ImageResult], episode_id: int) -> set[str]:
-    """投影片上的字由生圖模型寫，逐張比對大標與數字，並檢查亂碼、真人臉孔、時代地點錯誤、黑邊；回傳不合格的場景。"""
+def check_slides(p, scenes: dict[str, dict], slides: dict[str, ImageResult], episode_id: int,
+                 focus: dict[str, str] | None = None) -> set[str]:
+    """投影片上的字由生圖模型寫，逐張比對大標與數字，並檢查亂碼、真人臉孔、時代地點錯誤、黑邊；回傳不合格的場景。
+    focus 有傳入時，順便記下每張圖最有看頭的區域（剪輯「全景 → 特寫」用）。"""
     from PIL import Image
 
     bad: set[str] = {sid for sid, r in slides.items() if letterboxed(r.path)}
@@ -149,10 +152,13 @@ def check_slides(p, scenes: dict[str, dict], slides: dict[str, ImageResult], epi
             "依序檢查以下投影片（index 從 0 開始）。headline_correct：圖上的地名標籤是否與指定文字逐字相同（指定沒有標籤時，圖上必須完全沒有字）；number_correct：數字是否逐字相同；"
             "extra_or_garbled_text：是否出現指定以外的文字或亂碼；recognizable_real_person_face：是否畫出可辨識的真實歷史人物臉孔；"
             "wrong_place_or_era：畫面時代或地點是否明顯與旁白不符。"
-            "shows_narration：畫面是否畫出旁白在講的具體東西或動作（只是一般風景、和旁白無關時填 false）。\n\n" + listing,
+            "shows_narration：畫面是否畫出旁白在講的具體東西或動作（只是一般風景、和旁白無關時填 false）。"
+            "detail_area：畫面中最值得特寫的主體（人物動作、物件細節）在九宮格的哪個位置，放大後仍要完整看得到主體。\n\n" + listing,
             images, SLIDE_CHECK_SCHEMA, episode_id,
         )
         for res in v["results"]:
+            if focus is not None and 0 <= res["index"] < len(chunk):
+                focus[chunk[res["index"]]] = res.get("detail_area", "center")
             if 0 <= res["index"] < len(chunk) and (not res["headline_correct"] or not res["number_correct"] or res["extra_or_garbled_text"]
                                                    or res["recognizable_real_person_face"] or res["wrong_place_or_era"]
                                                    or not res["shows_narration"]):
@@ -161,21 +167,62 @@ def check_slides(p, scenes: dict[str, dict], slides: dict[str, ImageResult], epi
     return bad
 
 
-def make_slides(p, pending: list[dict], episode_id: int) -> dict[str, ImageResult]:
+def make_slides(p, pending: list[dict], episode_id: int, focus: dict[str, str] | None = None) -> dict[str, ImageResult]:
     """整集投影片：生成 → 審核 → 不合格的重做一次 → 再審，仍不合格的交給備用素材。"""
     st = get_storage()
     by_id = {sc["scene_id"]: sc for sc in pending}
     slides = p.slides.generate_many({sid: (slide_prompt(sc), st.path(episode_id, "assets", sid)) for sid, sc in by_id.items()},
                                     episode_id)
-    bad = check_slides(p, by_id, slides, episode_id)
+    bad = check_slides(p, by_id, slides, episode_id, focus)
     if bad:
         redo = p.slides.generate_many({sid: (slide_prompt(by_id[sid]), st.path(episode_id, "assets", sid)) for sid in bad}, episode_id)
-        still = check_slides(p, by_id, redo, episode_id)
+        still = check_slides(p, by_id, redo, episode_id, focus)
         for sid in bad:
             slides.pop(sid, None)
             if sid in redo and sid not in still:
                 slides[sid] = redo[sid]
     return slides
+
+
+FOOTAGE_CHECK_SCHEMA = {
+    "type": "object",
+    "properties": {"results": {"type": "array", "items": {"type": "object", "properties": {
+        "index": {"type": "integer"}, "fits": {"type": "boolean"}, "note": {"type": "string"}},
+        "required": ["index", "fits", "note"], "additionalProperties": False}}},
+    "required": ["results"],
+    "additionalProperties": False,
+}
+
+
+def find_footage(p, scenes: list[dict], episode_id: int) -> dict[str, ImageResult]:
+    """stock_video 場景：到 Pixabay 找免費實拍影片，再看截圖確認是對的城市、和旁白相符；找不到或不合格的回傳時不包含，交給投影片。"""
+    st = get_storage()
+    found: dict[str, ImageResult] = {}
+    for sc in scenes:
+        try:
+            r = _video(p, sc, st.path(episode_id, "assets", sc["scene_id"]), episode_id)
+        except Exception as e:
+            log.warning("footage_failed", extra={"episode_id": episode_id, "scene": sc["scene_id"], "err": str(e)[:300]})
+            r = None
+        if r:
+            found[sc["scene_id"]] = r
+    if not found or not hasattr(p.llm, "vision_json"):
+        return found
+    ids = list(found)
+    posters = [poster_frame(found[sid].path, st.path(episode_id, "assets", f"{sid}_check.jpg")) for sid in ids]
+    by_id = {sc["scene_id"]: sc for sc in scenes}
+    listing = "\n".join(f"{j}: 關鍵字「{by_id[sid]['search_query']}」；旁白：{by_id[sid]['script_text']}" for j, sid in enumerate(ids))
+    v = p.llm.vision_json(
+        "slide_check", "你是紀錄片的畫面審核員，只依圖片實際內容判斷。",
+        "以下是免費圖庫實拍影片的截圖（index 從 0 開始）。fits：畫面看起來是關鍵字裡的那個城市或同一國家的同類場景、"
+        "和旁白講的東西相符、沒有明顯浮水印或大段文字時填 true；地點明顯不對、和旁白無關時填 false。\n\n" + listing,
+        posters, FOOTAGE_CHECK_SCHEMA, episode_id,
+    )
+    ok = {ids[x["index"]] for x in v["results"] if 0 <= x["index"] < len(ids) and x["fits"]}
+    for sid in set(ids) - ok:
+        log.info("footage_rejected", extra={"episode_id": episode_id, "scene": sid})
+        found[sid].path.unlink(missing_ok=True)
+    return {sid: r for sid, r in found.items() if sid in ok}
 
 
 FALLBACKS = {
@@ -189,8 +236,12 @@ FALLBACKS = {
 
 def acquire(p, sc: dict, out: Path, episode_id: int, hero: Path | None, slides: dict | None = None) -> ImageResult:
     vt = sc["visual_type"]
-    if vt == "slide" and slides and sc["scene_id"] in slides:
+    if vt in ("slide", "stock_video") and slides and sc["scene_id"] in slides:
         return slides[sc["scene_id"]]
+    if vt == "outline":
+        cards.outline_card(sc["heading"], sc.get("outline_points", []), out.with_suffix(".jpg"))
+        return ImageResult(out.with_suffix(".jpg"), source="original:outline", creator="世界先修課",
+                           license="Original", usage_rights="owned")
     if vt == "chart" and sc.get("chart", {}).get("values"):
         cards.chart(sc["chart"], out.with_suffix(".png"))
         return ImageResult(out.with_suffix(".png"), source=f"original:chart:{sc['chart'].get('source', '')}",
@@ -220,9 +271,13 @@ def run(p, episode_id: int, only_scenes: set[str] | None = None) -> None:
     if only_scenes:
         for sid in only_scenes:
             manifest.pop(sid, None)
-    pending = [sc for sc in scenes if sc["visual_type"] == "slide"
-               and not (manifest.get(sc["scene_id"]) and Path(manifest[sc["scene_id"]]["file_path"]).exists())]
-    slides = make_slides(p, pending, episode_id) if p.slides and pending else {}
+    todo = [sc for sc in scenes if not (manifest.get(sc["scene_id"]) and Path(manifest[sc["scene_id"]]["file_path"]).exists())]
+    footage = find_footage(p, [sc for sc in todo if sc["visual_type"] == "stock_video"], episode_id) if p.stock_videos else {}
+    # 找不到合適實拍影片的場景改做投影片
+    pending = [sc for sc in todo if sc["visual_type"] == "slide" or (sc["visual_type"] == "stock_video" and sc["scene_id"] not in footage)]
+    focus: dict[str, str] = {}
+    slides = make_slides(p, pending, episode_id, focus) if p.slides and pending else {}
+    slides.update(footage)
     hero = None
     for sc in scenes:
         sid = sc["scene_id"]
@@ -240,7 +295,7 @@ def run(p, episode_id: int, only_scenes: set[str] | None = None) -> None:
                          "license": r.license, "license_url": r.license_url, "usage_rights": r.usage_rights,
                          "attribution_required": r.attribution_required, "ai_generated": r.ai_generated,
                          "realistic": r.realistic, "asset_type": sc["visual_type"], "media_type": r.media_type,
-                         "poster": str(poster)}
+                         "poster": str(poster), "focus": focus.get(sid, "center")}
         if sc.get("shot_type") == "map" and sc.get("map_points"):
             # 動態地圖用的真實座標（剪輯時由 HyperFrames 渲染；失敗就用上面的 AI 地圖）
             manifest[sid]["map"] = {"route": bool(sc.get("map_route")), "points": [
