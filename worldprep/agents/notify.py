@@ -36,7 +36,8 @@ def topic_choice(mark_shown: bool = True) -> tuple[str, str]:
             return _section("主題選擇", msg), f"【主題選擇】\n{msg}\n\n"
         city, options = row.city, row.options
         if mark_shown:
-            row.shown_at = datetime.now(timezone.utc)
+            for r in s.scalars(select(TopicOption).where(TopicOption.shown_at.is_(None))):
+                r.shown_at = datetime.now(timezone.utc)
     lines = [f"{i}. {o['main_title']}\n   故事：{o['angle']}\n   為什麼會想點：{o['why_click']}" for i, o in enumerate(options, 1)]
     body = f"城市：{city}\n\n" + "\n\n".join(lines) + "\n\n回覆「選 1／選 2／選 3」，或寫下你想修改的版本。"
     head = '<h2 style="margin:28px 0 0;font-size:17px;border-top:2px solid #d4a853;padding-top:14px">主題選擇</h2>'

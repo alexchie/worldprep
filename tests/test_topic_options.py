@@ -22,10 +22,13 @@ def test_reply_picks_option_and_next_city_gets_options():
     with session() as s:
         s.add(TopicRequest(message_id="m1", text=topic, received_at=datetime.now(timezone.utc)))
         s.add(TopicOption(message_id="m1", city=city))
+        s.add(TopicOption(message_id="m2", city=city))  # 同一個城市又回了一次：只想一次選項
     prepare_topic_options(p)
+    with session() as s:
+        assert len([o for o in s.scalars(select(TopicOption).where(TopicOption.city == "首爾")) if o.options]) == 1
     html, text = notify.topic_choice()
     assert "首爾" in text and "香港選項1" in text and "主題選擇" in html
     with session() as s:
-        assert s.scalar(select(TopicOption).where(TopicOption.city == "首爾")).shown_at is not None
+        assert all(o.shown_at for o in s.scalars(select(TopicOption).where(TopicOption.city == "首爾")))
     # 選項只出現一次；之後沒有新城市時改成提醒
     assert "還沒有收到後天想做的城市" in notify.topic_choice()[1]

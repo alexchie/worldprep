@@ -239,7 +239,11 @@ def prepare_topic_options(p: Providers) -> None:
     from .models import TopicOption
 
     with session() as s:
-        ids = list(s.scalars(select(TopicOption.id).where(TopicOption.options.is_(None))))
+        pending = list(s.scalars(select(TopicOption).where(TopicOption.shown_at.is_(None)).order_by(TopicOption.created_at.desc())))
+        # 只為最新一封回信的城市想選項；較舊、還沒寄出的（同城市重複或被改掉的）直接作廢
+        for old in pending[1:]:
+            old.shown_at = datetime.now(timezone.utc)
+        ids = [o.id for o in pending[:1] if o.options is None]
     for oid in ids:
         with session() as s:
             city = s.get(TopicOption, oid).city
