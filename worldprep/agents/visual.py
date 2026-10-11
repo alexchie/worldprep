@@ -239,7 +239,8 @@ def acquire(p, sc: dict, out: Path, episode_id: int, hero: Path | None, slides: 
     if vt in ("slide", "stock_video") and slides and sc["scene_id"] in slides:
         return slides[sc["scene_id"]]
     if vt == "outline":
-        cards.outline_card(sc["heading"], sc.get("outline_points", []), out.with_suffix(".jpg"))
+        k = sc.get("outline_reveal", len(sc.get("outline_points", [])))
+        cards.outline_card(sc["heading"], sc.get("outline_points", []), out.with_suffix(".jpg"), shown=max(0, k - 1))
         return ImageResult(out.with_suffix(".jpg"), source="original:outline", creator="世界先修課",
                            license="Original", usage_rights="owned")
     if vt == "chart" and sc.get("chart", {}).get("values"):
@@ -296,6 +297,9 @@ def run(p, episode_id: int, only_scenes: set[str] | None = None) -> None:
                          "attribution_required": r.attribution_required, "ai_generated": r.ai_generated,
                          "realistic": r.realistic, "asset_type": sc["visual_type"], "media_type": r.media_type,
                          "poster": str(poster), "focus": focus.get(sid, "center")}
+        if sc["visual_type"] == "outline" and 1 <= sc.get("outline_reveal", 0) <= len(sc.get("outline_points", [])[:4]):
+            manifest[sid]["outline_item"] = str(cards.outline_item(sc["outline_points"], sc["outline_reveal"],
+                                                                   st.path(episode_id, "assets", f"{sid}_item.png")))
         if sc.get("shot_type") == "map" and sc.get("map_points"):
             # 動態地圖用的真實座標（剪輯時由 HyperFrames 渲染；失敗就用上面的 AI 地圖）
             manifest[sid]["map"] = {"route": bool(sc.get("map_route")), "points": [

@@ -131,6 +131,31 @@ def split_clip(image: Path, overlay: Path | None, seconds: float, focus: str, ou
     return out
 
 
+def outline_clip(base: Path, item: Path | None, overlay: Path | None, seconds: float, out: Path,
+                 fade_in: float = 0.35, fade_out: float = 0.35, slide: float = 0.45) -> Path:
+    """大綱動畫：底圖是已出現的重點，新的一條在開頭從左側滑入並淡入（緩出曲線）。"""
+    n = max(1, int(round(seconds * FPS)))
+    args = ["-loop", "1", "-i", str(base)]
+    vf = f"[0:v]scale={W}:{H},setsar=1[b0]"
+    cur, idx = "b0", 1
+    if item:
+        args += ["-loop", "1", "-i", str(item)]
+        vf += (f";[1:v]format=rgba,fade=t=in:st=0:d={slide}:alpha=1[it]"
+               f";[b0][it]overlay=x='-120*pow(1-min(1,t/{slide}),2)':y=0[b1]")
+        cur, idx = "b1", 2
+    if overlay:
+        args += ["-loop", "1", "-i", str(overlay)]
+        vf += f";[{cur}][{idx}:v]overlay=0:0[b2]"
+        cur = "b2"
+    fades = ([f"fade=t=in:st=0:d={fade_in}"] if fade_in > 0 else []) + (
+        [f"fade=t=out:st={max(0, seconds - fade_out):.3f}:d={fade_out}"] if fade_out > 0 else [])
+    vf += f";[{cur}]{','.join([*fades, 'format=yuv420p'])}[v]"
+    args += ["-filter_complex", vf, "-map", "[v]", "-frames:v", str(n), "-r", str(FPS),
+             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-an", str(out)]
+    run_ffmpeg(args)
+    return out
+
+
 def video_clip(video: Path, overlay: Path | None, seconds: float, out: Path, fade: float = 0.35) -> Path:
     """實拍片段：裁成 1080p、統一 30fps、長度不足時循環、去掉原音（旁白另外混）。"""
     n = max(1, int(round(seconds * FPS)))

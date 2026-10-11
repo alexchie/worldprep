@@ -13,7 +13,7 @@ from ..db import session
 from ..logging_setup import log
 from ..models import Asset, Episode
 from ..render import motion
-from ..render.ffmpeg import concat, image_clip, media_duration, run_ffmpeg, silence, split_clip, video_clip
+from ..render.ffmpeg import concat, image_clip, media_duration, outline_clip, run_ffmpeg, silence, split_clip, video_clip
 from ..storage import get_storage
 from .subtitles import build_srt
 
@@ -124,6 +124,13 @@ def run(p, episode_id: int) -> None:
         if i == 0 and cover.exists():
             # 第一幀直接承接封面主視覺（封面可能重做，所以每次重剪）
             pending.append((image_clip, (cover, None, dur, "static", clip, 0.05)))
+        elif sc.get("visual_type") == "outline":
+            # 大綱：同一張底圖一條一條長出來，大綱段落之間不淡入淡出
+            prev = scenes[i - 1] if i else None
+            fi = 0.0 if prev and prev.get("visual_type") == "outline" else fade
+            fo = 0.0 if nxt and nxt.get("visual_type") == "outline" else fade
+            item = Path(m["outline_item"]) if m.get("outline_item") else None
+            pending.append((outline_clip, (Path(m["file_path"]), item, Path(m["overlay"]), dur, clip, fi, fo)))
         elif not clip.exists() or abs(media_duration(clip) - dur) > 0.15:
             if m.get("map") and motion.available():
                 map_jobs.append((m, dur, clip, fade, sc.get("camera_motion", "static")))

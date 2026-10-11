@@ -75,8 +75,10 @@ SCRIPT_RULES = """寫作規則：
 - sections 從 hook, outline, geography, history, city, business, culture, attractions, closing 中挑故事需要的使用（順序不變），一定要有 hook、outline 與 closing，其餘只在故事需要時才寫；寧可少段落也不要每段都蜻蜓點水。
 - hook：開場 15–23 秒講完（字數範圍見下方），依照「開場規範」：第一句直接承接本集 YouTube 標題的問題（延伸而非逐字朗讀），接著用一個真實、反直覺的事實或矛盾讓觀眾想追下去，不在 hook 裡解答。禁止問候、頻道介紹、目錄式開場。
 - hook 之後影片會自動插入固定品牌台詞，腳本裡不要寫品牌台詞。
-- outline（本集大綱，緊接在品牌台詞之後、正文之前）：只有一個段落、40–80 字，用口語告訴觀眾接下來會依序看哪幾件事、為什麼要看，讓觀眾知道每段在幹嘛（例如「要回答這個問題，我們分三步來看：先看……，再看……，最後看……。」）。不揭曉 hook 的答案、不說「大家好」「歡迎收看」。
-  outline_points：大綱的 3–4 個重點，依正文順序，各 4–12 字、像目錄標題（例如「天皇搬走的那一年」「織工的生存之道」），會以文字顯示在畫面上，必須和 outline 旁白講的一致、也和後面正文的段落順序一致。
+- outline（本集大綱，緊接在品牌台詞之後、正文之前）：用口語告訴觀眾接下來會依序看哪幾件事、為什麼要看，讓觀眾知道每段在幹嘛。不揭曉 hook 的答案、不說「大家好」「歡迎收看」。
+  outline_points：大綱的 3–4 個重點，依正文順序，各 4–12 字、像目錄標題（例如「天皇搬走的那一年」「織工的生存之道」），也和後面正文的段落順序一致。
+  畫面上的大綱會隨旁白一條一條跳出來，所以 outline 的 paragraphs 必須恰好是「1 + 重點數」段：第 1 段是一句引言（10–25 字，例如「要回答這個問題，我們分三步來看。」），
+  之後每段一句、依序對應一個重點（10–30 字，例如「第一，天皇搬走的那一年，京都差點變成空城。」），以「第一」「第二」「第三」（「最後」也可）開頭。
 - outline 之後的第一段直接進入故事，不再重複大綱。
 - 觀眾對這個地方幾乎一無所知：
   · geography 段落開頭先用 2–3 句幫觀眾定位：在世界的哪一區、靠什麼海或鄰近哪些國家、是哪個國家的哪種城市、主要說什麼語言。不要拿特定國家（包括台灣）比距離或大小。
@@ -146,6 +148,8 @@ def structural_issues(script: dict, target_chars: int, valid_ids: set[int]) -> l
     points = script.get("outline_points", [])
     if not 3 <= len(points) <= 4 or any(not 2 <= len(x) <= 14 for x in points):
         issues.append(f"大綱：outline_points 應為 3–4 個、各 4–12 字：{points}")
+    elif outline and len(outline[0]["paragraphs"]) != len(points) + 1:
+        issues.append(f"大綱：outline 要分成 {len(points) + 1} 段（一句引言＋每個重點一句），目前 {len(outline[0]['paragraphs'])} 段")
     bad = {cid for sec in script["sections"] for p in sec["paragraphs"] for cid in p["claim_ids"]} - valid_ids
     if bad:
         issues.append(f"引用了未查核的事實編號：{sorted(bad)}")

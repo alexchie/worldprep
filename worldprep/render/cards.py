@@ -148,28 +148,34 @@ def text_overlay(text: str, out: Path, watermark: bool = True) -> Path:
     return out
 
 
-def outline_card(heading: str, points: list[str], out: Path) -> Path:
-    """本集大綱：觀眾在聽大綱旁白時，同時看到條列的重點。"""
+def _outline_item(d: ImageDraw.ImageDraw, points: list[str], i: int) -> None:
+    f = _font(76 if len(points) <= 3 else 68)
+    step = 170 if len(points) <= 3 else 150
+    y = 300 + (4 - len(points)) * 30 + (i - 1) * step
+    d.ellipse([160, y + 4, 240, y + 84], fill=GOLD)
+    nf = _font(52)
+    d.text((200 - nf.getlength(str(i)) / 2, y + 12), str(i), font=nf, fill=NAVY_DEEP)
+    d.text((290, y), _wrap(points[i - 1], f, W - 450)[0], font=f, fill=WHITE)
+
+
+def outline_card(heading: str, points: list[str], out: Path, shown: int | None = None) -> Path:
+    """本集大綱底圖：標題＋前 shown 條重點（預設全部）。"""
     img = _gradient()
     d = ImageDraw.Draw(img)
     d.text((160, 150), heading or ("In this episode" if edition.current().lang == "en" else "本集大綱"), font=_font(56), fill=GOLD)
     d.line([(160, 240), (300, 240)], fill=GOLD, width=6)
     points = points[:4]
-    f = _font(76 if len(points) <= 3 else 68)
-    step = 170 if len(points) <= 3 else 150
-    y = 300 + (4 - len(points)) * 30
-    for i, pt in enumerate(points, 1):
-        d.ellipse([160, y + 4, 240, y + 84], fill=GOLD)
-        num = str(i)
-        nf = _font(52)
-        d.text((200 - nf.getlength(num) / 2, y + 12), num, font=nf, fill=NAVY_DEEP)
-        d.text((290, y), _wrap(pt, f, W - 450)[0], font=f, fill=WHITE)
-        y += step
-    wm = mark(84)
-    wm.putalpha(wm.getchannel("A").point(lambda a: int(a * 0.55)))
-    img = img.convert("RGBA")
-    img.alpha_composite(wm, (W - wm.width - 44, 44))
-    img.convert("RGB").save(out, quality=95)
+    for i in range(1, min(len(points), len(points) if shown is None else shown) + 1):
+        _outline_item(d, points, i)
+    img.save(out, quality=95)
+    return out
+
+
+def outline_item(points: list[str], i: int, out: Path) -> Path:
+    """透明圖層：只有第 i 條重點，剪輯時讓它在旁白講到時滑入。"""
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    _outline_item(ImageDraw.Draw(img), points[:4], i)
+    img.save(out)
     return out
 
 

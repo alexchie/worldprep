@@ -125,6 +125,7 @@ def build_assets(p, episode_id: int, scenes: list[dict], zh_scenes: dict, zh_man
         if sc["visual_type"] == "chart" and sc.get("chart", {}).get("values"):
             m["file_path"] = m["poster"] = str(cards.chart(sc["chart"], st.path(episode_id, "assets", f"{sid}.png")))
         elif m["source"].startswith("original"):
+            m.pop("outline_item", None)  # 中文大綱條目不能出現在英文版
             m["file_path"] = m["poster"] = str(cards.title_card(sc.get("slide_headline") or sc["heading"], "",
                                                                 st.path(episode_id, "assets", f"{sid}.jpg")))
         elif sc.get("slide_headline") and m["source"].startswith("gemini") and p.slides:

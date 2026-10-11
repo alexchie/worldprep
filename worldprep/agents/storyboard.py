@@ -146,7 +146,10 @@ def run(p, episode_id: int) -> None:
     by_id = {x["scene_id"]: x for x in data["scenes"]}
     for sc in scenes:
         if sc["section"] == "outline":
-            sc.update({"visual_type": "outline", "outline_points": script.get("outline_points", []), "shot_type": "outline",
+            # 第 0 段是引言；第 k 段講到第 k 個重點，畫面同時跳出第 k 條
+            reveal = [x["scene_id"] for x in scenes if x["section"] == "outline"].index(sc["scene_id"])
+            sc.update({"visual_type": "outline", "outline_points": script.get("outline_points", []), "outline_reveal": reveal,
+                       "shot_type": "outline",
                        "visual_description": "", "slide_headline": "", "slide_number": "", "search_query": "", "ai_prompt": "",
                        "realistic": False, "camera_motion": "static", "transition": "fade", "on_screen_text": "",
                        "map_required": False, "chart_required": False, "map_place": "", "map_caption": "", "map_points": [],
