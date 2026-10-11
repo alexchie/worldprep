@@ -164,7 +164,14 @@ def outline_card(heading: str, points: list[str], out: Path, shown: int | None =
     有 background（本集封面）時，封面以指定透明度疊在品牌深藍上、輕微模糊，左側再加漸層暗區，確保字卡清楚。"""
     img = _gradient()
     if background and background.exists():
-        bg = _cover(Image.open(background).convert("RGB"), (W, H)).filter(ImageFilter.GaussianBlur(12))
+        sharp = _cover(Image.open(background).convert("RGB"), (W, H))
+        # 只模糊封面的文字區（左側大標題、右上角集數標誌），右側照片保持清晰；邊界柔和過渡
+        mask = Image.new("L", (W, H), 0)
+        md = ImageDraw.Draw(mask)
+        md.rectangle([0, 0, int(W * 0.5), H], fill=255)
+        md.rectangle([int(W * 0.8), 0, W, int(H * 0.2)], fill=255)
+        mask = mask.filter(ImageFilter.GaussianBlur(90))
+        bg = Image.composite(sharp.filter(ImageFilter.GaussianBlur(12)), sharp, mask)
         img = Image.blend(img, bg, 1 - transparency)
         shade = Image.new("L", (W, 1))
         for x in range(W):
