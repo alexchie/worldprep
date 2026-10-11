@@ -12,7 +12,7 @@ from ..config import get_settings
 from ..db import session
 from ..logging_setup import log
 from ..models import Asset, Episode
-from ..render import motion
+from ..render import cards, motion
 from ..render.ffmpeg import concat, image_clip, media_duration, outline_clip, run_ffmpeg, silence, split_clip, video_clip
 from ..storage import get_storage
 from .subtitles import build_srt
@@ -130,7 +130,13 @@ def run(p, episode_id: int) -> None:
             fi = 0.0 if prev and prev.get("visual_type") == "outline" else fade
             fo = 0.0 if nxt and nxt.get("visual_type") == "outline" else fade
             item = Path(m["outline_item"]) if m.get("outline_item") else None
-            pending.append((outline_clip, (Path(m["file_path"]), item, Path(m["overlay"]), dur, clip, fi, fo)))
+            base = Path(m["file_path"])
+            if sc.get("outline_points") and ed.lang == "zh" and cover.exists():
+                # 大綱背景固定用本集封面（70% 透明）；封面在剪輯前才做好，所以在這裡重畫底圖
+                k = sc.get("outline_reveal", 0)
+                base = cards.outline_card(sc["heading"], sc.get("outline_points", []), vdir / f"{sid}_outline.jpg",
+                                          shown=max(0, k - 1), background=cover)
+            pending.append((outline_clip, (base, item, Path(m["overlay"]), dur, clip, fi, fo)))
         elif not clip.exists() or abs(media_duration(clip) - dur) > 0.15:
             if m.get("map") and motion.available():
                 map_jobs.append((m, dur, clip, fade, sc.get("camera_motion", "static")))

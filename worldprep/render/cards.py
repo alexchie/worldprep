@@ -155,14 +155,24 @@ def _outline_item(d: ImageDraw.ImageDraw, points: list[str], i: int) -> None:
     d.ellipse([160, y + 4, 240, y + 84], fill=GOLD)
     nf = _font(52)
     d.text((200 - nf.getlength(str(i)) / 2, y + 12), str(i), font=nf, fill=NAVY_DEEP)
-    d.text((290, y), _wrap(points[i - 1], f, W - 450)[0], font=f, fill=WHITE)
+    d.text((290, y), _wrap(points[i - 1], f, W - 450)[0], font=f, fill=WHITE, stroke_width=3, stroke_fill=NAVY_DEEP)
 
 
-def outline_card(heading: str, points: list[str], out: Path, shown: int | None = None) -> Path:
-    """本集大綱底圖：標題＋前 shown 條重點（預設全部）。"""
+def outline_card(heading: str, points: list[str], out: Path, shown: int | None = None, background: Path | None = None,
+                 transparency: float = 0.7) -> Path:
+    """本集大綱底圖：標題＋前 shown 條重點（預設全部）。
+    有 background（本集封面）時，封面以指定透明度疊在品牌深藍上、輕微模糊，左側再加漸層暗區，確保字卡清楚。"""
     img = _gradient()
+    if background and background.exists():
+        bg = _cover(Image.open(background).convert("RGB"), (W, H)).filter(ImageFilter.GaussianBlur(12))
+        img = Image.blend(img, bg, 1 - transparency)
+        shade = Image.new("L", (W, 1))
+        for x in range(W):
+            shade.putpixel((x, 0), int(150 * max(0.0, 1 - x / (W * 0.75))))
+        img = Image.composite(Image.new("RGB", (W, H), NAVY_DEEP), img, shade.resize((W, H)))
     d = ImageDraw.Draw(img)
-    d.text((160, 150), heading or ("In this episode" if edition.current().lang == "en" else "本集大綱"), font=_font(56), fill=GOLD)
+    d.text((160, 150), heading or ("In this episode" if edition.current().lang == "en" else "本集大綱"), font=_font(56), fill=GOLD,
+           stroke_width=2, stroke_fill=NAVY_DEEP)
     d.line([(160, 240), (300, 240)], fill=GOLD, width=6)
     points = points[:4]
     for i in range(1, min(len(points), len(points) if shown is None else shown) + 1):
