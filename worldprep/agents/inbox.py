@@ -12,7 +12,7 @@ from ..brand import CHANNEL_NAME
 from ..config import get_settings
 from ..db import session
 from ..logging_setup import log
-from ..models import TopicRequest
+from ..models import TopicOption, TopicRequest
 from ..retry import with_retry
 
 LOOKBACK_DAYS = 14
@@ -60,9 +60,31 @@ def extract_topic(body: str) -> str:
     return " ".join(lines)[:500]
 
 
+def shown_options() -> list[dict] | None:
+    """最近一封通知信提供的主題選項（回信寫「選 2」時用來對照）。"""
+    with session() as s:
+        row = s.scalar(select(TopicOption).where(TopicOption.shown_at.is_not(None)).order_by(TopicOption.shown_at.desc()))
+        return [dict(o, city=row.city) for o in row.options] if row and row.options else None
+
+
+def resolve(p, text: str) -> tuple[str, str]:
+    """回信 → (明天的主題, 後天的城市)。沒有 LLM 時整封當作主題（舊的回信方式）。"""
+    if p is None:
+        return text, ""
+    options = shown_options()
+    from .topic import parse_reply
+
+    r = parse_reply(p, text, options)
+    topic = r["custom_topic"].strip()
+    if not topic and options and 1 <= r["option_number"] <= len(options):
+        o = options[r["option_number"] - 1]
+        topic = f"{o['city']}：{o['angle']}\n指定標題：{o['main_title']}"
+    return topic, r["next_city"].strip()
+
+
 @with_retry(attempts=3)
-def fetch_requests() -> int:
-    """抓取新的主題回覆存入資料庫，回傳新增筆數。"""
+def fetch_requests(p=None) -> int:
+    """抓取新的回信：明天的主題存入排隊，後天的城市交給企劃想選項。回傳新增筆數。"""
     cfg = get_settings()
     if not (cfg.smtp_user and cfg.smtp_password and cfg.email_to):
         return 0
@@ -73,7 +95,7 @@ def fetch_requests() -> int:
         imap.select("INBOX", readonly=True)
         _, data = imap.search(None, "FROM", f'"{cfg.email_to}"', "SINCE", since)
         with session() as s:
-            known = set(s.scalars(select(TopicRequest.message_id)))
+            known = set(s.scalars(select(TopicRequest.message_id))) | set(s.scalars(select(TopicOption.message_id)))
         for num in data[0].split():
             _, parts = imap.fetch(num, "(BODY.PEEK[])")
             msg = email.message_from_bytes(parts[0][1])
@@ -93,11 +115,15 @@ def fetch_requests() -> int:
                 received = parsedate_to_datetime(msg.get("Date"))
             except Exception:
                 received = datetime.now(timezone.utc)
+            topic, city = resolve(p, text)
             with session() as s:
-                s.add(TopicRequest(message_id=mid[:500], text=text, received_at=received))
+                if topic:
+                    s.add(TopicRequest(message_id=mid[:500], text=topic, received_at=received))
+                if city:
+                    s.add(TopicOption(message_id=mid[:500], city=city[:120]))
             known.add(mid)
             added += 1
-            log.info("topic_request_received", extra={"subject": subject[:100], "topic": text[:100]})
+            log.info("topic_request_received", extra={"subject": subject[:100], "topic": topic[:100], "next_city": city})
     return added
 
 

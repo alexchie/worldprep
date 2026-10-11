@@ -13,7 +13,8 @@ from ..states import State
 from ..storage import get_storage
 from .english import email as english_email
 
-REQUEST_HINT = "想指定下一集主題？直接回覆這封信，寫下目的地或想看的角度（例如「京都：為什麼能活過千年」）。凌晨 2:00 前回覆，隔天 08:00 收到成品；沒有回覆的那天不製作。可一次回覆多封，系統每天做一集、依序製作。"
+REQUEST_HINT = ("每天回覆這封信兩件事：(1) 明天的主題——從上方「主題選擇」選一個（例如「選 2」），也可以自己改寫；"
+                "(2) 後天想做的城市或地區。晚上 10:00 前回覆，10:00 開始製作，隔天 08:00 收到成品；沒有選主題的那天不製作。")
 REQUEST_HINT_HTML = (f'<div style="background:#0b1b3a;color:#fff;border-radius:6px;padding:12px 16px;margin-top:20px">'
                      f'<b style="color:#d4a853">指定下一集</b><br>{html.escape(REQUEST_HINT)}</div>')
 BOX = "background:#f5f3ee;border:1px solid #e0dccf;border-radius:6px;padding:14px;white-space:pre-wrap;font-size:14px;line-height:1.6"
@@ -23,7 +24,26 @@ def _section(label: str, body: str) -> str:
     return f'<h3 style="margin:22px 0 6px;font-size:15px">{label}</h3><div style="{BOX}">{html.escape(body)}</div>'
 
 
-def episode_email(eid: int) -> tuple[str, str, str]:
+def topic_choice(mark_shown: bool = True) -> tuple[str, str]:
+    """「主題選擇」區塊：頻道主前一晚給的城市，企劃想好的 3 個選項；沒有城市時提醒回覆。回傳 (html, text)。"""
+    from ..models import TopicOption
+
+    with session() as s:
+        row = s.scalar(select(TopicOption).where(TopicOption.options.is_not(None), TopicOption.shown_at.is_(None))
+                       .order_by(TopicOption.created_at.desc()))
+        if row is None:
+            msg = "還沒有收到後天想做的城市。回覆這封信時，請一併告訴我後天想做的城市或地區，下一封信會附上 3 個主題選項。"
+            return _section("主題選擇", msg), f"【主題選擇】\n{msg}\n\n"
+        city, options = row.city, row.options
+        if mark_shown:
+            row.shown_at = datetime.now(timezone.utc)
+    lines = [f"{i}. {o['main_title']}\n   故事：{o['angle']}\n   為什麼會想點：{o['why_click']}" for i, o in enumerate(options, 1)]
+    body = f"城市：{city}\n\n" + "\n\n".join(lines) + "\n\n回覆「選 1／選 2／選 3」，或寫下你想修改的版本。"
+    head = '<h2 style="margin:28px 0 0;font-size:17px;border-top:2px solid #d4a853;padding-top:14px">主題選擇</h2>'
+    return head + f'<div style="{BOX};margin-top:8px">{html.escape(body)}</div>', f"【主題選擇】\n{body}\n\n"
+
+
+def episode_email(eid: int, choice: tuple[str, str] = ("", "")) -> tuple[str, str, str]:
     st = get_storage()
     meta = st.read_json(eid, "final", "metadata.json")
     with session() as s:
@@ -69,6 +89,7 @@ def episode_email(eid: int) -> tuple[str, str, str]:
 {_section("置頂留言（建議）", meta.get("pinned_comment", ""))}
 {'<h2 style="margin:28px 0 0;font-size:17px;border-top:2px solid #d4a853;padding-top:14px">宣傳文案（導流到 YouTube 正片）</h2>' if promos else ""}
 {"".join(_section(label, body) for label, body in promos)}
+{choice[0]}
 <h3 style="margin:22px 0 6px;font-size:15px">上傳檢查清單</h3>
 <ol style="line-height:1.8;padding-left:20px">{"".join(f"<li>{html.escape(x)}</li>" for x in checklist)}</ol>
 {REQUEST_HINT_HTML}
@@ -77,7 +98,7 @@ def episode_email(eid: int) -> tuple[str, str, str]:
     text = (f"{CHANNEL_NAME} {ep_label(n)} 已完成\n\nDrive：{folder}\nQA：{qa}\n\n【YouTube 標題】\n{meta['title']}\n\n"
             + (f"【備選標題】\n{alternates}\n\n" if alternates else "")
             + f"【YouTube 說明】\n{meta['description']}\n\n【置頂留言】\n{meta.get('pinned_comment', '')}\n\n"
-            + "".join(f"【{label}】\n{body}\n\n" for label, body in promos)
+            + "".join(f"【{label}】\n{body}\n\n" for label, body in promos) + choice[1]
             + "【上傳檢查清單】\n" + "\n".join(f"- {x}" for x in checklist)
             + f"\n\n{REQUEST_HINT}\n重做：GitHub Actions → regenerate，episode_id = {eid}")
     subject = f"{CHANNEL_NAME} {ep_label(n)} 已完成：{meta['main_title']}"
@@ -90,8 +111,14 @@ def send_daily(p) -> list[int]:
     st = get_storage()
     with session() as s:
         ids = list(s.scalars(select(Episode.id).where(Episode.status == State.DELIVERED.value).order_by(Episode.id)))
+    if not cfg.mock:
+        from ..pipeline import prepare_topic_options
+
+        prepare_topic_options(p)  # 製作時沒想好的選項，寄信前補上
+    choice = topic_choice()
     for eid in ids:
-        subject, body, text = episode_email(eid)
+        subject, body, text = episode_email(eid, choice)
+        choice = ("", "")  # 同一天有多集時，主題選擇只放在第一封
         p.email.send(cfg.email_to or "owner@localhost", subject, body, text,
                      {"thumb": st.path(eid, "thumbnails", "thumbnail.jpg")})
         en = english_email(eid) if cfg.english_enabled else None  # 英文頻道 Beyond Travel 另寄一封
@@ -118,6 +145,6 @@ def send_daily(p) -> list[int]:
             err = ep.last_error if ep else ""
         p.email.send(cfg.email_to or "owner@localhost", f"{CHANNEL_NAME} 今日沒有新影片",
                      f"<p>目前狀態：{html.escape(status)}</p>" + (f"<pre>{html.escape(err[:3000])}</pre>" if err else "")
-                     + REQUEST_HINT_HTML,
-                     f"目前狀態：{status}\n{err[:3000]}\n\n{REQUEST_HINT}")
+                     + choice[0] + REQUEST_HINT_HTML,
+                     f"目前狀態：{status}\n{err[:3000]}\n\n{choice[1]}{REQUEST_HINT}")
     return ids

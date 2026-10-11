@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     gemini_cost_factor: float = 1.3  # 記帳時的保守係數（實際帳單比每張定價高）
     research_max_searches: int = 8
 
-    schedule_produce: str = "18:00"
+    schedule_produce: str = "22:00"  # 晚上 10 點前回信，10 點開始製作
     schedule_email: str = "08:00"
 
     font_bold: str = ""

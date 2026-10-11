@@ -128,6 +128,17 @@ class Topic(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class TopicOption(Base):
+    """頻道主回信告知「後天的城市」；企劃為它想 3 個主題選項，放進下一封通知信的「主題選擇」區塊。"""
+    __tablename__ = "topic_options"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    message_id: Mapped[str] = mapped_column(String(500), default="")
+    city: Mapped[str] = mapped_column(String(120))
+    options: Mapped[list | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    shown_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class TopicRequest(Base):
     """頻道主回覆通知信指定的主題；依收到順序排隊，每次製作取最早一筆。"""
     __tablename__ = "topic_requests"

@@ -123,6 +123,10 @@ class MockLLM:
             return {"country": "日本", "city": "東京", "title_lines": ["為什麼東京", "能成為世界之都？"], "gold_keywords": ["世界之都"],
                     "subtitle": "從江戶到未來", "core_question": "東京為什麼能成為世界之都", "direction": "綜合",
                     "landmarks": ["東京鐵塔", "富士山"], "mood": "宏偉", "scene": "Tokyo Tower at dusk with Mount Fuji"}
+        if task == "topic_options":
+            return {"options": [{"main_title": f"香港選項{i}", "angle": "mock", "why_click": "mock", "archetype": "A"} for i in (1, 2, 3)]}
+        if task == "reply_parse":
+            return {"option_number": 2, "custom_topic": "", "next_city": "首爾"}
         if task == "title_judge":
             picks = re.findall(r"^- \[([A-G])\] (.+)$", prompt, re.M)[:3]
             return {"picks": [{"main_title": t, "archetype": a, "reason": "mock"} for a, t in picks]}

@@ -222,6 +222,37 @@ def _made_tonight() -> bool:
     return latest >= start
 
 
+def in_production_window() -> bool:
+    """製作時段：SCHEDULE_PRODUCE（22:00）到隔天寄信時間（08:00）。"""
+    from zoneinfo import ZoneInfo
+
+    from .config import get_settings
+
+    cfg = get_settings()
+    now = datetime.now(ZoneInfo(cfg.timezone)).strftime("%H:%M")
+    return now >= cfg.schedule_produce or now < cfg.schedule_email
+
+
+def prepare_topic_options(p: Providers) -> None:
+    """頻道主回信給了後天的城市：請企劃先想好 3 個主題選項，放進下一封通知信。"""
+    from .agents.topic import topic_options
+    from .models import TopicOption
+
+    with session() as s:
+        ids = list(s.scalars(select(TopicOption.id).where(TopicOption.options.is_(None))))
+    for oid in ids:
+        with session() as s:
+            city = s.get(TopicOption, oid).city
+        try:
+            opts = topic_options(p, city)
+        except Exception as e:
+            log.warning("topic_options_failed", extra={"city": city, "err": str(e)[:300]})
+            continue
+        with session() as s:
+            s.get(TopicOption, oid).options = opts
+        log.info("topic_options_ready", extra={"city": city})
+
+
 def produce(p: Providers, destination: str | None = None) -> int | None:
     """每日製作：續跑未完成（含失敗）的集數；否則依序採用 指定目的地 → email 指定主題 → 選題池（TOPIC_FALLBACK=auto）。"""
     from . import costs
@@ -239,11 +270,15 @@ def produce(p: Providers, destination: str | None = None) -> int | None:
         raise PermanentError(f"今日支出已達預算 {cfg.daily_budget_usd} USD，停止製作，需人工確認")
     if eid is None and destination:
         eid = select_topic(p, destination) if cfg.mock else select_topic_from_request(p, None, destination)
+    if eid is None and not destination and not cfg.mock and not in_production_window():
+        log.info("before_production_window")  # 晚上 10 點前不開新集數，等頻道主回信
+        return None
     if eid is None and not cfg.mock:
         try:
-            inbox.fetch_requests()
+            inbox.fetch_requests(p)
         except Exception as e:
             log.warning("topic_inbox_failed", extra={"err": str(e)[:300]})
+        prepare_topic_options(p)
         req = inbox.next_request()
         if req:
             eid = select_topic_from_request(p, req.id, req.text)

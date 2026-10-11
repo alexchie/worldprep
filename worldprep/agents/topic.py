@@ -138,8 +138,77 @@ def judge_titles(p, brief: dict, candidates: list[dict], episode_id: int | None 
     return [{"main_title": x["main_title"], "archetype": x["archetype"]} for x in r["picks"][:3]] or candidates[:3]
 
 
-def plan(p, request: str) -> dict:
-    """製作人：依指定主題產出本集企劃（核心問題、原型、12 個候選標題、各同事的工作說明），再由總編輯挑出 3 個標題。"""
+PLANNER_ROLE = """你是一位帶出多個訂閱破 1000 萬 YouTube 頻道的資深企劃。你很清楚市場：觀眾在首頁滑過去時會被什麼停下來、
+哪些題材類型（反常識、意外的數字、熟悉東西背後的祕密、一個人改變一座城、你以為…其實…）有高點擊與高完看，
+也知道標題怎麼寫才會在前 15 個字就抓住人。你現在為「世界先修課」企劃下一集。"""
+
+OPTIONS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "options": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "main_title": {"type": "string"},
+                    "angle": {"type": "string"},
+                    "why_click": {"type": "string"},
+                    "archetype": {"type": "string", "enum": ARCHETYPES},
+                },
+                "required": ["main_title", "angle", "why_click", "archetype"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["options"],
+    "additionalProperties": False,
+}
+
+
+def topic_options(p, city: str) -> list[dict]:
+    """為頻道主指定的城市想 3 個彼此不同、第一眼就想點的主題與標題，讓頻道主在通知信裡選。"""
+    r = p.llm.json(
+        "topic_options", f"{EDITORIAL_DNA}\n\n{PLANNER_ROLE}\n\n{title_style()}",
+        f"頻道主指定的城市或地區：「{city}」\n近期已製作：{_recent()}\n\n"
+        "提出 3 個主題選項，讓頻道主挑一個做成 5–7 分鐘、只講一個有趣故事的影片：\n"
+        "- main_title：完整主標題，28 字以內，不含「｜世界先修課 EP.xx」；鉤子要具體（物件、現象、人物、數字、反差），前 15 字就看得懂。\n"
+        "- angle：一句話說明這集要講的故事（觀眾最後會懂什麼）。\n"
+        "- why_click：一句話說明為什麼市場會想點（用你的企劃經驗判斷）。\n"
+        "三個要是完全不同的切入點與標題原型；只用你有把握、研究時查得到的事實，不誇大。",
+        OPTIONS_SCHEMA,
+    )
+    return r["options"][:3]
+
+
+REPLY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "option_number": {"type": "integer"},
+        "custom_topic": {"type": "string"},
+        "next_city": {"type": "string"},
+    },
+    "required": ["option_number", "custom_topic", "next_city"],
+    "additionalProperties": False,
+}
+
+
+def parse_reply(p, text: str, options: list[dict] | None) -> dict:
+    """讀頻道主的回信：明天要做的主題（選項編號或自己寫的主題）＋後天的城市。"""
+    listing = "\n".join(f"{i}. {o['main_title']}" for i, o in enumerate(options or [], 1)) or "（這封信沒有提供選項）"
+    return p.llm.json(
+        "reply_parse", "你負責讀頻道主回覆通知信的內容，抽出兩件事。只依回信內容判斷，不要自己發明。",
+        f"上一封通知信提供的主題選項：\n{listing}\n\n頻道主的回信：\n{text}\n\n"
+        "option_number：頻道主選了第幾個選項（1–3）；沒有選選項時填 0。\n"
+        "custom_topic：頻道主自己寫的明天主題或標題（含城市），原文照抄；選了選項而且沒有另外改寫時填空字串。"
+        "頻道主是選了某個選項再補充修改時，填上修改後的完整說法。\n"
+        "next_city：頻道主說後天（下一個）想做的城市或地區；沒提到時填空字串。",
+        REPLY_SCHEMA,
+    )
+
+
+def plan(p, request: str, fixed_title: str = "") -> dict:
+    """製作人：依指定主題產出本集企劃（核心問題、原型、12 個候選標題、各同事的工作說明），再由總編輯挑出 3 個標題。
+    頻道主已從選項中選定標題時（fixed_title），該標題固定放第一。"""
     brief = p.llm.json(
         "topic_request", producer_system(),
         f"頻道主指定的下一集主題：「{request}」\n近期已製作：{_recent()}\n\n"
@@ -148,6 +217,9 @@ def plan(p, request: str) -> dict:
     )
     brief["title_pool"] = brief["titles"]
     brief["titles"] = judge_titles(p, brief, brief["title_pool"])
+    if fixed_title:
+        brief["titles"] = [{"main_title": fixed_title, "archetype": brief["archetype"]}] + [
+            t for t in brief["titles"] if t["main_title"] != fixed_title][:2]
     return brief
 
 
@@ -273,5 +345,8 @@ def select_topic(p, destination: str | None = None) -> int:
 
 
 def select_topic_from_request(p, request_id: int | None, text: str) -> int:
-    """依頻道主指定的主題（email 回覆或手動指定目的地）建立新集數。"""
-    return _create(plan(p, text), text, request_id)
+    """依頻道主指定的主題（email 回覆或手動指定目的地）建立新集數。「指定標題：」那一行是從主題選項中選定的標題。"""
+    import re
+
+    m = re.search(r"指定標題：(.+)", text)
+    return _create(plan(p, text, m.group(1).strip() if m else ""), text, request_id)

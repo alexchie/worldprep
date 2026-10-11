@@ -18,6 +18,8 @@ TASK_TIER = {
     "topic": "sonnet",
     "topic_request": "sonnet",  # 製作人：讀風格指南、定核心問題與候選標題、寫各同事的工作說明
     "title_judge": "opus",  # 總編輯：從候選中挑第一眼最有趣的 3 個標題
+    "topic_options": "opus",  # 千萬訂閱等級的企劃：為頻道主給的城市想 3 個主題選項
+    "reply_parse": "haiku",  # 讀頻道主回信：明天的主題＋後天的城市
     "research": "sonnet",
     "research_extract": "haiku",
     "factcheck": "opus",
@@ -36,7 +38,7 @@ TASK_TIER = {
     "qa_vision_escalate": "opus",
 }
 # 需要即時結果的工作不走 Batch；其餘在夜間排程中改用 Batch API（半價）
-SYNC_TASKS = {"research", "topic", "topic_request"}
+SYNC_TASKS = {"research", "topic", "topic_request", "topic_options", "reply_parse"}
 
 
 class ClaudeProvider:

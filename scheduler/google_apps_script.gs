@@ -27,10 +27,10 @@ function triggerEmail() {
   dispatch_('daily-email.yml');
 }
 
-/** 每小時呼叫一次，只在台北 18:00–07:00 叫 GitHub 製作（當晚已開過新集數就只續跑未完成的） */
+/** 每小時呼叫一次，只在台北 22:00–07:00 叫 GitHub 製作（當晚已開過新集數就只續跑未完成的） */
 function triggerProduce() {
   const hour = Number(Utilities.formatDate(new Date(), TZ, 'H'));
-  if (hour >= 18 || hour < 7) dispatch_('daily-produce.yml');
+  if (hour >= 22 || hour < 7) dispatch_('daily-produce.yml');
 }
 
 /** 確認金鑰可以讀到這個 repo 的 Actions */

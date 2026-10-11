@@ -9,12 +9,12 @@
 ## 運作方式（GitHub Actions，不需要開著電腦）
 
 ```
-每天 18:00  daily-produce ：Drive 取回狀態 → 製作一集 → QA → 成品交付 Drive → 狀態寫回 Drive
+每天 22:00  daily-produce ：Drive 取回狀態 → 製作一集 → QA → 成品交付 Drive → 狀態寫回 Drive
 每天 08:00  daily-email   ：寄通知信（標題、YouTube 說明、標籤、置頂留言、縮圖、Drive 連結、上傳檢查清單）
 手動        regenerate    ：不滿意時重做 標題 / 縮圖 / 腳本 / 指定場景 / 整支影片，完成後下一封 08:00 信通知
 ```
 
-**指定主題**：直接回覆任何一封通知信，寫下目的地或角度（例如「京都：為什麼能活過千年」）。18:00 開工前系統會讀取回覆，依收到順序排隊製作。只接受 `EMAIL_TO` 信箱寄出、且通過 Gmail 寄件人驗證、主旨含「世界先修課」的信。沒有指定時依 `TOPIC_FALLBACK`：`auto` 從選題池自動選題，`skip` 當天不製作。
+**指定主題**：每天回覆通知信兩件事——明天的主題（從信中「主題選擇」選一個或自己寫）與後天的城市（企劃會在下一封信提供 3 個主題選項）。22:00 開工前系統會讀取回覆，依收到順序排隊製作。只接受 `EMAIL_TO` 信箱寄出、且通過 Gmail 寄件人驗證、主旨含「世界先修課」的信。沒有指定時依 `TOPIC_FALLBACK`：`auto` 從選題池自動選題，`skip` 當天不製作。
 
 **模型分配**：見 `worldprep/providers/llm_claude.py` 的 `TASK_TIER`。研究用 Sonnet＋網搜、事實查核用 Opus（不同模型互相把關）、腳本與腳本審查用 Opus，其餘用 Sonnet / Haiku。研究與選題以外的步驟走 Batch API（半價，單步等待上限 `BATCH_WAIT_MINUTES`，逾時自動改即時呼叫）；腳本審查的事實清單與網搜續傳使用 prompt caching。
 
