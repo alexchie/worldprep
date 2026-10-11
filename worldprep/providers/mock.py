@@ -59,6 +59,8 @@ class MockLLM:
             return {"thesis": "東京是一座在災難與重建中不斷重新定義自己的城市。",
                     "outline_points": ["從江戶到東京", "地震後的重建", "今天的東京"],
                     "sections": [{"section": sec, "heading": h, "causal_link": "",
+                                  "outline_point": {"hook": 0, "outline": 0, "geography": 1, "history": 1, "city": 2,
+                                                    "business": 2}.get(sec, 3),
                                   "paragraphs": [{"text": t, "claim_ids": ids[:1]} for t in paras]} for sec, h, paras in SCRIPT]}
         if task == "script_review":
             return {"pass": True, "coherent": True, "follows_structure": True, "hook_strong": True,

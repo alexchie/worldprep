@@ -37,6 +37,18 @@ VISION_SCHEMA = {
 }
 
 
+MAX_GAP = 1.3  # 正常停頓最長約 0.9 秒（段落之間）；超過 1.3 秒多半是配音中斷
+
+
+def silent_gaps(wav, threshold_db: int = -45) -> list[tuple[float, float]]:
+    import re
+
+    err = run_ffmpeg(["-i", str(wav), "-af", f"silencedetect=n={threshold_db}dB:d={MAX_GAP}", "-f", "null", "-"])
+    starts = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", err)]
+    ends = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", err)]
+    return list(zip(starts, ends))
+
+
 def _check(results: list, group: str, name: str, ok: bool, detail: str = "", critical: bool = True) -> None:
     results.append({"group": group, "check": name, "pass": bool(ok), "detail": detail, "critical": critical})
 
@@ -118,6 +130,12 @@ def run(p, episode_id: int) -> bool:
         _check(r, "audio", "no_clipping", vol["max_db"] is not None and vol["max_db"] < -0.1, f"peak {vol['max_db']} dB")
         _check(r, "audio", "narration_audible", vol["mean_db"] is not None and vol["mean_db"] > -35, f"mean {vol['mean_db']} dB",
                critical=not cfg.mock)
+    narration = st.path(episode_id, "audio", "narration.wav")
+    if narration.exists() and not cfg.mock:
+        gaps = silent_gaps(narration)
+        _check(r, "audio", "no_audio_dropouts", not gaps,
+               "旁白有不正常的長空白（可能聲音中斷）：" + "、".join(f"{a // 60:.0f}:{a % 60:04.1f}（{b - a:.1f}s）" for a, b in gaps[:8]),
+               critical=False)
     _check(r, "audio", "sync", abs(dur - timeline["total"]) < 1.5, f"video {dur:.1f}s / timeline {timeline['total']:.1f}s")
 
     # Branding

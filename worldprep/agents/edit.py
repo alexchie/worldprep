@@ -72,6 +72,33 @@ def _map_clip(m: dict, dur: float, clip: Path, fade: float, cam: str, lang: str)
     image_clip(Path(m["file_path"]), Path(m["overlay"]), dur, cam, clip, fade)
 
 
+def progress_bar(episode_id: int, timeline: list[dict], total: float, vdir: Path, first_input: int) -> tuple[list[str], str]:
+    """正文上方的大綱進度條：目前所在的重點亮金色，底部金線隨時間延伸。回傳 (額外 ffmpeg 輸入, filter 片段)。"""
+    from ..brand import GOLD
+
+    script = get_storage().read_json(episode_id, "scripts", "script.json")
+    points = script.get("outline_points", [])
+    starts: dict[int, float] = {}
+    for sc in timeline:
+        if sc.get("chapter") and sc["chapter"] not in starts:
+            starts[sc["chapter"]] = sc["start"]
+    if not points or sorted(starts) != list(range(1, len(points) + 1)):
+        return [], ""
+    keys = sorted(starts)
+    body = starts[1]
+    chapters = [(points[k - 1], starts[k], starts[k + 1] if k + 1 in starts else total) for k in keys]
+    extra = ["-f", "lavfi", "-i", f"color=c=0x{''.join(f'{c:02x}' for c in GOLD)}:s=1920x{cards.PROGRESS_LINE}:r=30"]
+    line_in = first_input
+    parts, cur = [], "{IN}"
+    for i, (name, a, b) in enumerate(chapters):
+        extra += ["-loop", "1", "-i", str(cards.progress_strip(chapters, body, total, i, vdir / f"progress_{i}.png"))]
+        parts.append(f"[{cur}][{first_input + 1 + i}:v]overlay=0:0:shortest=1:enable='between(t,{a:.3f},{b:.3f})'[p{i}]")
+        cur = f"p{i}"
+    parts.append(f"[{cur}][{line_in}:v]overlay=x='-w+w*clip((t-{body:.3f})/{total - body:.3f},0,1)':y={cards.PROGRESS_H - cards.PROGRESS_LINE}"
+                 f":shortest=1:enable='gte(t,{body:.3f})'[v]")
+    return extra, ";".join(parts)
+
+
 def opening_table(timeline: list[dict], brand_at: float | None, brand_len: float, brand_line: str) -> str:
     """開場製作表（opening/opening_prompt.txt 第 7 節），用實際剪輯時間填寫。"""
     rows = ["| 時間 | 畫面 | 旁白 |", "|---|---|---|"]
@@ -152,7 +179,7 @@ def run(p, episode_id: int) -> None:
         video_parts.append(clip)
         audio_parts += [Path(voice["file"]), silence(pad, adir / f"pad_{pad:.2f}.wav")]
         timeline.append({"scene_id": sid, "section": sc["section"], "heading": sc["heading"], "section_start": sc["section_start"],
-                         "start": t, "duration": voice["duration"], "text": sc["script_text"]})
+                         "start": t, "duration": voice["duration"], "text": sc["script_text"], "chapter": sc.get("chapter", 0)})
         t += dur
         if last_hook:
             # Hook 與空白停頓之後：固定品牌圖＋品牌台詞，接著直接進正文
@@ -192,6 +219,11 @@ def run(p, episode_id: int) -> None:
         shutil.copy(srt, vdir / "subs.srt")
         style = f"FontName={get_settings().subtitle_font},FontSize=15,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1.6,Shadow=0,MarginV=36"
         vf = f"[0:v]subtitles=subs.srt:force_style='{style}'[v]"
+    if ed.lang == "zh":
+        extra, chain = progress_bar(episode_id, timeline, t, vdir, inputs.count("-i"))
+        if chain:
+            inputs += extra
+            vf = vf.replace("[v]", "[vs]") + ";" + chain.replace("{IN}", "vs")
     tmp = vdir / "episode_tmp.mp4"
     run_ffmpeg([*inputs, "-filter_complex", f"{vf};{af}", "-map", "[v]", "-map", "[a]",
                 "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", "-r", "30",

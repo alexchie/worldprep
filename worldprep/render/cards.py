@@ -196,6 +196,30 @@ def outline_item(points: list[str], i: int, out: Path) -> Path:
     return out
 
 
+PROGRESS_H, PROGRESS_LINE = 46, 5
+
+
+def progress_strip(chapters: list[tuple[str, float, float]], start: float, end: float, active: int, out: Path) -> Path:
+    """正文上方的大綱進度條（一行）：依各重點實際長度分段，目前所在的重點亮金色。進度金線由剪輯時動態疊上。"""
+    img = Image.new("RGBA", (W, PROGRESS_H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, W, PROGRESS_H], fill=NAVY_DEEP + (190,))
+    d.rectangle([0, PROGRESS_H - PROGRESS_LINE, W, PROGRESS_H], fill=(255, 255, 255, 60))
+    span = max(1e-6, end - start)
+    for i, (name, a, b) in enumerate(chapters):
+        x0, x1 = (a - start) / span * W, (b - start) / span * W
+        if i:
+            d.rectangle([x0 - 2, 6, x0 + 1, PROGRESS_H - PROGRESS_LINE - 6], fill=(255, 255, 255, 90))
+        f = _font(26)
+        label = f"{i + 1}  {name}"
+        while f.getlength(label) > x1 - x0 - 40 and len(label) > 4:
+            label = label[:-2] + "…"
+        d.text(((x0 + x1) / 2 - f.getlength(label) / 2, 7), label, font=f,
+               fill=GOLD + (255,) if i == active else WHITE + (150,))
+    img.save(out)
+    return out
+
+
 def _cover(img: Image.Image, size: tuple[int, int]) -> Image.Image:
     w, h = size
     s = max(w / img.width, h / img.height)

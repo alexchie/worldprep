@@ -91,6 +91,7 @@ def base_scenes(script: dict) -> list[dict]:
                     "section": sec["section"],
                     "heading": sec["heading"],
                     "section_start": pi == 0 and ci == 0,
+                    "chapter": sec.get("outline_point", 0) if sec["section"] not in ("hook", "outline") else 0,
                     "script_text": chunk.strip(),
                     "claim_ids": para["claim_ids"],
                 })

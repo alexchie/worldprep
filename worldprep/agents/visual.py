@@ -52,7 +52,7 @@ SLIDE_STYLE = (
     "Fill the entire frame edge to edge: no black bars, no letterboxing, no borders or frames. Natural light, rich detail, subtle deep navy (#0b1b3a) and warm gold (#d4a853) grading, consistent across the episode. "
     "No fake documents with writing, no English, no logos, no watermark. Real historical people: never show a recognizable face "
     "(use back view, silhouette, distance, or their objects). Maps: simple stylized silhouette with at most two place labels. "
-    "Keep the bottom 20% of the frame free of any text (subtitles go there)."
+    "Keep the bottom 20% and the top 8% of the frame free of any text (subtitles and a progress bar go there)."
 )
 
 
@@ -60,7 +60,7 @@ def slide_text(sc: dict) -> str:
     head, number = sc.get("slide_headline", ""), sc.get("slide_number", "")
     if not head and not number:
         return "Text: none. Absolutely no words, letters or numbers anywhere in the image."
-    parts = [f"a small elegant place label \"{head}\" in the top-left corner"] if head else []
+    parts = [f"a small elegant place label \"{head}\" in the upper-left area (not touching the top 8% of the frame)"] if head else []
     if number:
         parts.append(f"the number \"{number}\" in gold")
     return ("Text: show ONLY " + " and ".join(parts) + " (Traditional Chinese as used in Taiwan, exactly as written). "

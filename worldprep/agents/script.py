@@ -24,6 +24,7 @@ SCRIPT_SCHEMA = {
                 "properties": {
                     "section": {"type": "string", "enum": SECTION_ORDER},
                     "heading": {"type": "string"},
+                    "outline_point": {"type": "integer"},
                     "causal_link": {"type": "string"},
                     "paragraphs": {
                         "type": "array",
@@ -38,7 +39,7 @@ SCRIPT_SCHEMA = {
                         },
                     },
                 },
-                "required": ["section", "heading", "causal_link", "paragraphs"],
+                "required": ["section", "heading", "outline_point", "causal_link", "paragraphs"],
                 "additionalProperties": False,
             },
         },
@@ -80,6 +81,7 @@ SCRIPT_RULES = """寫作規則：
   畫面上的大綱會隨旁白一條一條跳出來，所以 outline 的 paragraphs 必須恰好是「1 + 重點數」段：第 1 段是一句引言（10–25 字，例如「要回答這個問題，我們分三步來看。」），
   之後每段一句、依序對應一個重點（10–30 字，例如「第一，天皇搬走的那一年，京都差點變成空城。」），以「第一」「第二」「第三」（「最後」也可）開頭。
 - outline 之後的第一段直接進入故事，不再重複大綱。
+- outline_point：正文每個段落屬於第幾個大綱重點（1 起算；畫面上方的進度條會依此顯示目前講到哪個重點），依序不可倒退、每個重點至少一段，closing 歸在最後一個重點；hook 與 outline 填 0。
 - 觀眾對這個地方幾乎一無所知：
   · geography 段落開頭先用 2–3 句幫觀眾定位：在世界的哪一區、靠什麼海或鄰近哪些國家、是哪個國家的哪種城市、主要說什麼語言。不要拿特定國家（包括台灣）比距離或大小。
   · 每個地名、人名、事件第一次出現時，用一句白話說明它是什麼、在哪裡、是誰（例如「西班牙——當年歐洲最強的海上帝國之一——」）。
@@ -150,6 +152,9 @@ def structural_issues(script: dict, target_chars: int, valid_ids: set[int]) -> l
         issues.append(f"大綱：outline_points 應為 3–4 個、各 4–12 字：{points}")
     elif outline and len(outline[0]["paragraphs"]) != len(points) + 1:
         issues.append(f"大綱：outline 要分成 {len(points) + 1} 段（一句引言＋每個重點一句），目前 {len(outline[0]['paragraphs'])} 段")
+    marks = [sec.get("outline_point", 0) for sec in script["sections"] if sec["section"] not in ("hook", "outline")]
+    if points and (marks != sorted(marks) or set(marks) != set(range(1, len(points) + 1))):
+        issues.append(f"大綱：正文段落的 outline_point 應依序涵蓋 1–{len(points)}，目前為 {marks}")
     bad = {cid for sec in script["sections"] for p in sec["paragraphs"] for cid in p["claim_ids"]} - valid_ids
     if bad:
         issues.append(f"引用了未查核的事實編號：{sorted(bad)}")
