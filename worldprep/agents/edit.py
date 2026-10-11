@@ -149,8 +149,8 @@ def run(p, episode_id: int) -> None:
         clip = vdir / f"{sid}.mp4"
         fade = 0.12 if sc.get("transition") == "cut" else 0.35
         if i == 0 and cover.exists():
-            # 第一幀直接承接封面主視覺（封面可能重做，所以每次重剪）
-            pending.append((image_clip, (cover, None, dur, "static", clip, 0.05)))
+            # 第一幀直接承接封面主視覺（封面可能重做，所以每次重剪）；不淡入，第 0 格就是封面，不會先黑一下
+            pending.append((image_clip, (cover, None, dur, "static", clip, 0.05, 0.0)))
         elif sc.get("visual_type") == "outline":
             # 大綱：同一張底圖一條一條長出來，大綱段落之間不淡入淡出
             prev = scenes[i - 1] if i else None

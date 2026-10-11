@@ -87,8 +87,8 @@ def run(p, episode_id: int, force: bool = False) -> Path | None:
         run_ffmpeg(["-i", base.name, "-vf", f"ass={ass.name}", "-c:v", "libx264", "-preset", "medium", "-crf", "20",
                     "-c:a", "copy", "-movflags", "+faststart", out.name], cwd=out.parent)
     base.unlink(missing_ok=True)
-    # Shorts 封面＝短影音的第一個畫面但不含字幕（第一幀有 0.05 秒淡入，取 0.1 秒避開黑畫面）
-    run_ffmpeg(["-ss", "0.1", "-i", str(silent.resolve()), "-frames:v", "1", "-filter_complex", f"[0:v]{VERTICAL}",
+    # Shorts 封面＝短影音的第一個畫面但不含字幕
+    run_ffmpeg(["-i", str(silent.resolve()), "-frames:v", "1", "-filter_complex", f"[0:v]{VERTICAL}",
                 "-q:v", "2", str(st.path(episode_id, "thumbnails", "short_cover.jpg").resolve())])
     log.info("short_done", extra={"episode_id": episode_id, "seconds": round(media_duration(out), 1)})
     return out
