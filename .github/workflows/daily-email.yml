@@ -1,15 +1,21 @@
 name: daily-email
 
 on:
-  schedule:
-    # GitHub 排程常延遲甚至漏跑，所以在台北 07:40–09:10 間觸發多次；同一天只會寄一次（已寄過就跳過）
-    - cron: "40 23 * * *"
-    - cron: "55 23 * * *"
-    - cron: "10 0 * * *"
-    - cron: "25 0 * * *"
-    - cron: "40 0 * * *"
-    - cron: "10 1 * * *"
+  # 暫停中（2026-10-13）：要恢復請把下面幾行取消註解，並移除 job 上的 force 條件
+  # schedule:
+  #  # GitHub 排程常延遲甚至漏跑，所以在台北 07:40–09:10 間觸發多次；同一天只會寄一次（已寄過就跳過）
+  #  - cron: "40 23 * * *"
+  #  - cron: "55 23 * * *"
+  #  - cron: "10 0 * * *"
+  #  - cron: "25 0 * * *"
+  #  - cron: "40 0 * * *"
+  #  - cron: "10 1 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: "暫停期間手動執行請勾選（外部排程觸發不會勾，會直接跳過）"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -41,6 +47,8 @@ env:
 
 jobs:
   run:
+    # 暫停中：只有手動勾選 force 才會跑（擋住 Google Apps Script 每小時的自動觸發）
+    if: ${{ inputs.force }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
